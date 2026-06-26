@@ -1,4 +1,4 @@
-AG_venv
+.AS_VENV
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
