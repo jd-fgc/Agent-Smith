@@ -1,4 +1,5 @@
-.AS_VENV
+.venv
+.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
