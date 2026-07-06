@@ -1,10 +1,22 @@
-from typing import Dict
+from typing import Dict, List
 import subprocess
 
 
-def run_tests():
-    # Run test.sh
-    pass
+def run_tests(solution_code: str, test_list: List[str],
+              test_imports: List[str]) -> str:
+    script = ""
+    imp = ""
+    tests = ""
+
+    for impt in test_imports:
+        imp += f"import {impt}\n"
+    for tst in test_list:
+        tests += f"try:\n    {tst}\n    print('PASS: {tst}')\n\
+except AssertionError:\n    print('FAIL: {tst}')\n"
+
+    script = imp + solution_code + "\n" + tests
+
+    return script
 
 
 def get_patch() -> Dict[str, str | int]:
