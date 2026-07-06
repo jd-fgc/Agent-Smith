@@ -18,6 +18,8 @@ def extract_code(text: str) -> str | ToolCall:
         return XML_block(text)
     elif "Action:" in text:
         return ReAct_block(text)
+    else:
+        return "Error"
 
 
 def python_block(text: str) -> str | None:
@@ -97,7 +99,7 @@ def tool_call_reformer(call: ToolCall) -> str:
     args = len(call.arguments)
     curr_arg = 1
     for key, value in call.arguments.items():
-        result.append(f"{key}={value.__repr__()}")
+        result.append(f"{key}={value!r}")
         if curr_arg < args:
             result.append(",")
         curr_arg += 1
@@ -106,25 +108,22 @@ def tool_call_reformer(call: ToolCall) -> str:
     return func_call
 
 
-        
-
-
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # code = "```python\n" + \
     # "def addition(a, b):\n" + \
     # "   return a + b\n" + \
     # "```"
-    code = "Action: calculator\n" + \
-        "Action Input:\n" + \
-        "{\n" + \
-            '"expression": "2+2"\n' + \
-        "}"
+    # code = "Action: calculator\n" + \
+    #     "Action Input:\n" + \
+    #     "{\n" + \
+    #         '"expression": "2+2"\n' + \
+    #     "}"
     # code = '<invoke name="search">\n' + \
     #         '<parameter name="query">Paris weather</parameter>\n' + \
     #         '</invoke>'
-    extracted_code = extract_code(code)
-    if isinstance(extracted_code, ToolCall):
-        result = tool_call_reformer(extracted_code)
-        print(result)
-    else:
-        print(extracted_code)
+    # extracted_code = extract_code(code)
+    # if isinstance(extracted_code, ToolCall):
+    #     result = tool_call_reformer(extracted_code)
+    #     print(result)
+    # else:
+    #     print(extracted_code)
