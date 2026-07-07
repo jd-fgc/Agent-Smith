@@ -19,7 +19,7 @@ def extract_code(text: str) -> str | ToolCall:
     elif "Action:" in text:
         return ReAct_block(text)
     else:
-        return "Error"
+        return text
 
 
 def python_block(text: str) -> str | None:
