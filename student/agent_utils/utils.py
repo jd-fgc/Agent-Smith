@@ -1,0 +1,91 @@
+from openai import OpenAI
+from openai.types.chat import ChatCompletion
+from dotenv import load_dotenv
+import os
+
+
+class Tool:
+    def __init__(self, name: str, signature: str, description: str) -> None:
+        self.name = name
+        self.signature = signature
+        self.description = description
+
+
+def load_model(key: str, provider_url: str) -> OpenAI:
+    load_dotenv()
+    client = OpenAI(api_key=key,
+                    base_url=provider_url)
+    return client
+
+
+def respond(llm: OpenAI, model: str, prompt: str) -> ChatCompletion:
+    response = llm.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+    )
+    return response
+
+
+def load_keys() -> list[str]:
+    load_dotenv()
+    keys = []
+    for i in range(5):
+        keys.append(os.getenv(f"OPENAI_API_KEY_{i+1}"))
+    return keys
+
+
+def load_tools() -> dict[str, Tool]:
+    result = {}
+    Tools = []
+    Tools.append(Tool(
+        name="read_file",
+        signature="read_file(filepath: str, start_line: int, end_line: int)",
+        description="Read the content of a file between start_line and" + \
+            " end_line."
+    ))
+    Tools.append(Tool(
+        name="edit_file",
+        signature="edit_file(filepath: str, old_str: str, new_str: str)",
+        description="Replace in a file every occurences of old_str by new_str"
+    ))
+    Tools.append(Tool(
+        name="list_files",
+        signature="list_files(directory: str, pattern: str)",
+        description="list all files in directory ending by pattern.\n" + \
+            "\tFor example list_files('./', '*.py') will list all files " + \
+            "in ./ ending by .py."
+    ))
+    Tools.append(Tool(
+        name="search_code",
+        signature="search_code(pattern: str, file_pattern: str)",
+        description="Search for specific pattern of code in file ending " + \
+            "in file_pattern."
+    ))
+    Tools.append(Tool(
+        name="search_function_or_class_definition_in_code",
+        signature="search_function_or_class_definition_in_code(name: str)",
+        description="Search in all files for the function, or class, " + \
+            "definition of name."
+    ))
+    Tools.append(Tool(
+        name="find_references",
+        signature="find_references(name: str, filepath: str, line: int)",
+        description="Find references of name in filepath at line."
+    ))
+    Tools.append(Tool(
+        name="get_patch",
+        signature="get_patch()",
+        description="Run the following command git -c core.fileMode=false" + \
+            "diff and return the output."
+    ))
+    Tools.append(Tool(
+        name="run_command",
+        signature="run_command(command: str, workdir: str)",
+        description="Run the command given as parameter in workdir"
+    ))
+
+    for tool in Tools:
+        result[tool.name] = tool
+    return result

@@ -1,38 +1,11 @@
 from code_parser import extract_code, tool_call_reformer, ToolCall
 from MBPP_models import StepMetrics, SolutionOutput, MBPPTaskInput
-from tools.execution_tools import run_tests
+from tools import run_tests
+from agent_utils import load_model, load_keys, respond
 from openai import OpenAI, RateLimitError
-from openai.types.chat import ChatCompletion
-from dotenv import load_dotenv
 from typing import Any
 import time
-import os
 import json
-
-
-def load_model(key: str, provider_url: str) -> OpenAI:
-    load_dotenv()
-    client = OpenAI(api_key=key,
-                    base_url=provider_url)
-    return client
-
-
-def respond(llm: OpenAI, model: str, prompt: str) -> ChatCompletion:
-    response = llm.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-    )
-    return response
-
-
-def load_keys() -> list[str]:
-    load_dotenv()
-    keys = []
-    for i in range(5):
-        keys.append(os.getenv(f"OPENAI_API_KEY_{i+1}"))
-    return keys
 
 
 def load_tasks(path) -> MBPPTaskInput:

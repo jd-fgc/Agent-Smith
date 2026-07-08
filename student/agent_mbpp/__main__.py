@@ -1,4 +1,5 @@
-from agent_mbpp.loop_mbpp import load_keys, load_model, load_tasks, agent_loop_mbpp
+from agent_utils import load_keys, load_model
+from agent_mbpp.loop_mbpp import load_tasks, agent_loop_mbpp
 from MBPP_models import SolutionOutput
 from typing import Any
 import fire

@@ -10,7 +10,9 @@ class ToolCall(BaseModel):
 
 
 def extract_code(text: str) -> str | ToolCall:
-    if "```" in text:
+    if text.startswith("{"):
+        return dict_format(text)
+    elif "```" in text:
         return python_block(text)
     elif "<tool_call>" in text:
         return JSON_block(text)
@@ -106,6 +108,24 @@ def tool_call_reformer(call: ToolCall) -> str:
     result.append(")")
     func_call = "".join(result)
     return func_call
+
+
+def dict_format(text: str) -> ToolCall:
+    try:
+        data = json.loads(text)
+    except Exception:
+        data = ast.literal_eval(text)
+
+    try:
+        return ToolCall(
+            tool=data["tool"],
+            arguments=data.get("arguments", {})
+        )
+    except KeyError:
+        return ToolCall(
+            tool=data["tool"],
+            arguments=data.get("parameters", {})
+        )
 
 
 # if __name__ == "__main__":
