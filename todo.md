@@ -33,3 +33,4 @@ expose : tool_read_file, tool_edit_file, tool_list_file,
          tool_search_code, tool_search_function_or_class_definition_in_code,
          tool_find_references, tool_get_patch, tool_run_command
 lancé en stdio par défaut, HTTP avec --http
+
