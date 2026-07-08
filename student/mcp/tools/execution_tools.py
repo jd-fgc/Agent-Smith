@@ -9,9 +9,13 @@ def run_tests(solution_code: str, test_list: List[str], test_imports: List[str])
     for impt in test_imports:
         imp += f"import {impt}\n"
     for tst in test_list:
-        escaped = tst.replace("'", "\"")
-        tests += f"try:\n    {tst}\n    print('PASS: {escaped}')\n\
-except AssertionError:\n    print('FAIL: {escaped}')\n"
+        escaped = tst.replace("'", '"')
+        block = "try:\n"
+        block += f"    {tst}\n"
+        block += f"    print('PASS: {escaped}')\n"
+        block += "except AssertionError:\n"
+        block += f"    print('FAIL: {escaped}')\n"
+        tests += block
     script = imp + solution_code + "\n" + tests
 
     return script
