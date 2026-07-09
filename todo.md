@@ -34,3 +34,25 @@ expose : tool_read_file, tool_edit_file, tool_list_file,
          tool_find_references, tool_get_patch, tool_run_command
 lancé en stdio par défaut, HTTP avec --http
 
+
+MBPP :
+1. agent reçoit la tâche (function à écrire + tests)
+2. LLM génère le code de la fonction
+3. agent appelle run_tests() → construit un script Python
+4. sandbox.execute(script) → exécute le script dans un process isolé
+5. le script fait juste des assert et print PASS/FAIL
+6. sandbox retourne le résultat à l'agent
+7. agent renvoie le résultat au LLM pour itérer
+Pas de tools MCP pendant l'exécution — juste du Python pur.
+
+SWE-bench :
+1. agent reçoit la tâche (bug dans un vrai repo)
+2. LLM génère du code qui APPELLE des tools :
+   result = read_file("/testbed/sympy/core.py", 1, 50)
+   result = search_code("def solve", "*.py")
+3. sandbox.execute(code) → exécute ce code
+4. pendant l'exécution, le code appelle read_file()
+   → le worker doit communiquer avec le process principal
+   → qui appelle le MCP server
+   → qui retourne le résultat
+5. LLM itère jusqu'à trouver le bug et appeler final_answer()

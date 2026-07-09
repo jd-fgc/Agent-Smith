@@ -4,27 +4,70 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 import multiprocessing
+from pathlib import Path
+
+import resource
 import sys
 import io
 
-from pydantic import BaseModel
+
+from pydantic import BaseModel, Field
 from typing import List
 
 
-def worker(code, namespace, result_queue):
+def worker(code, namespace, result_queue, max_memory_mb):
+    restricted_memory = max_memory_mb * 1024 * 1024
+    resource.setrlimit(resource.RLIMIT_AS, (restricted_memory, restricted_memory))
+
     captured_stdout = io.StringIO()
     sys.stdout = captured_stdout
     try:
         exec(code, namespace)
-        result_queue.put({
-            "success": True,
-            "output": captured_stdout.getvalue()})
+        result_queue.put({"success": True, "output": captured_stdout.getvalue()})
+    except MemoryError:
+        sys.stdout = sys.__stdout__
+        result_queue.put({"success": False, "output": "MEMORY LIMIT EXCEEDED"})
     except Exception as e:
-        result_queue.put({
-            "success": False,
-            "output": str(e)})
+        result_queue.put({"success": False, "output": str(e)})
     finally:
         sys.stdout = sys.__stdout__
+
+
+class SandboxConfig(BaseModel):
+    """Sandbox configuration for student solutions.
+    Uses allowlist approach: only imports in authorized_imports are allowed.
+    Everything else is blocked by default.
+    """
+
+    authorized_imports: List[str] = Field(
+        default_factory=lambda: [
+            "math",
+            "math.*",
+            "collections",
+            "collections.*",
+            "itertools",
+            "re",
+            "json",
+            "typing",
+            "typing.*",
+            "functools",
+            "operator",
+            "heapq",
+            "bisect",
+            "copy",
+            "string",
+            "random",
+            "datetime",
+            "datetime.*",
+            "array",
+            "cmath",
+        ]
+    )
+    allowed_directories: List[str] = Field(
+        default_factory=lambda: ["/testbed", "/tmp/agent"]
+    )
+    max_execution_time_seconds: int = 30
+    max_memory_mb: int = 512
 
 
 class Sandbox:
@@ -68,6 +111,14 @@ class Sandbox:
         else:
             raise ImportError(f"Import '{name}' not autorised")
 
+    def safe_open(self, filepath, *args, **kwargs):
+        path = Path(filepath).resolve()
+
+        for allowed in self.config.allowed_directories:
+            if str(path).startswith(allowed):
+                return open(filepath, *args, **kwargs)
+        raise PermissionError(f"ACCESS DENIED: {filepath}")
+
     def _make_tool_wrapper(self, tool_name):
         def wrapper(**kwargs):
             return asyncio.run(self.session.call_tool(tool_name, kwargs))
@@ -82,6 +133,7 @@ class Sandbox:
 
         namespace["__builtins__"] = {
             "__import__": self.safe_import,
+            "open": self.safe_open,
             "print": print,
             "len": len,
             "range": range,
@@ -128,7 +180,7 @@ class Sandbox:
 
         process = multiprocessing.Process(
             target=worker,
-            args=(code, namespace, result_queue)
+            args=(code, namespace, result_queue, self.config.max_memory_mb)
         )
         process.start()
         process.join(timeout=self.config.max_execution_time_seconds)
@@ -136,4 +188,6 @@ class Sandbox:
             process.terminate()
             return {"success": False, "output": "TIMEOUT"}
         else:
+            if result_queue.empty():
+                return {"success": False, "output": f"PROCESS KILLED (exitcode: {process.exitcode})"}
             return result_queue.get()
