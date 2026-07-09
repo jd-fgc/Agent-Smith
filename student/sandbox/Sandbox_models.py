@@ -5,10 +5,15 @@ from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 import multiprocessing
 from pathlib import Path
+
 import socket
 import resource
 import sys
 import io
+
+
+from pydantic import BaseModel, Field
+from typing import List
 
 
 def block_network():
@@ -20,16 +25,14 @@ def block_network():
 
 def worker(code, namespace, result_queue, max_memory_mb):
     restricted_memory = max_memory_mb * 1024 * 1024
-    resource.setrlimit(resource.RLIMIT_AS, (restricted_memory,
-                                            restricted_memory))
+    resource.setrlimit(resource.RLIMIT_AS, (restricted_memory, restricted_memory))
     block_network()
 
     captured_stdout = io.StringIO()
     sys.stdout = captured_stdout
     try:
         exec(code, namespace)
-        result_queue.put({"success": True,
-                          "output": captured_stdout.getvalue()})
+        result_queue.put({"success": True, "output": captured_stdout.getvalue()})
     except MemoryError:
         sys.stdout = sys.__stdout__
         result_queue.put({"success": False, "output": "MEMORY LIMIT EXCEEDED"})
@@ -37,6 +40,43 @@ def worker(code, namespace, result_queue, max_memory_mb):
         result_queue.put({"success": False, "output": str(e)})
     finally:
         sys.stdout = sys.__stdout__
+
+
+class SandboxConfig(BaseModel):
+    """Sandbox configuration for student solutions.
+    Uses allowlist approach: only imports in authorized_imports are allowed.
+    Everything else is blocked by default.
+    """
+
+    authorized_imports: List[str] = Field(
+        default_factory=lambda: [
+            "math",
+            "math.*",
+            "collections",
+            "collections.*",
+            "itertools",
+            "re",
+            "json",
+            "typing",
+            "typing.*",
+            "functools",
+            "operator",
+            "heapq",
+            "bisect",
+            "copy",
+            "string",
+            "random",
+            "datetime",
+            "datetime.*",
+            "array",
+            "cmath",
+        ]
+    )
+    allowed_directories: List[str] = Field(
+        default_factory=lambda: ["/testbed", "/tmp/agent"]
+    )
+    max_execution_time_seconds: int = 30
+    max_memory_mb: int = 512
 
 
 class Sandbox:
