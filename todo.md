@@ -1,4 +1,24 @@
 
+student/
+    agent/
+        agent_mbpp.py        # CLI + boucle agent MBPP
+        agent_swebench.py    # CLI + boucle agent SWE-bench
+    sandbox/
+        sandbox.py           # classe Sandbox + worker
+    mcp/
+        tools/
+            file_system_tools.py
+            code_search_tools.py
+            execution_tools.py
+            __init__.py
+        mcp_tools_mbpp.py
+        mcp_tools_swebench.py
+    models/
+        mbpp_models.py       # MBPPTaskInput, SolutionOutput, StepMetrics
+        swe_models.py        # SWEBenchTaskInput
+        sandbox_config.py    # SandboxConfig
+    __main__.py              # point d'entrée sandbox REPL
+    pyproject.toml
 
 **Resumer  method**
 
