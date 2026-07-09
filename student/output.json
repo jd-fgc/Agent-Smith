@@ -1,0 +1,29 @@
+{
+    "task_id": "282",
+    "benchmark": "mbpp",
+    "success": true,
+    "solution": "def sub_list(nums1, nums2):\n    return list(map(lambda x, y: x - y, nums1, nums2))",
+    "system_prompt": "Write a function to substaract two lists using map and lambda function. The function is declared as follow: def sub_list(nums1,nums2): Only give the function.",
+    "iterations": 1,
+    "total_requests": 1,
+    "total_input_tokens": 78,
+    "total_output_tokens": 544,
+    "total_time_seconds": 4566.2,
+    "steps": [
+        {
+            "step": 1,
+            "input_tokens": 78,
+            "output_tokens": 544,
+            "request_time_ms": 4566.2,
+            "api_url": "https://openrouter.ai/api/v1/",
+            "model_name": "poolside/laguna-xs-2.1:free",
+            "llm_output": "def sub_list(nums1, nums2):\n    return list(map(lambda x, y: x - y, nums1, nums2))",
+            "sandbox_input": "def sub_list(nums1, nums2):\n    return list(map(lambda x, y: x - y, nums1, nums2))\ntry:\n    assert sub_list([1,2],[3,4])==[-2,-2]\n    print('PASS: assert sub_list([1,2],[3,4])==[-2,-2]')\nexcept AssertionError:\n    print('FAIL: assert sub_list([1,2],[3,4])==[-2,-2]')\ntry:\n    assert sub_list([90,120],[50,70])==[40,50]\n    print('PASS: assert sub_list([90,120],[50,70])==[40,50]')\nexcept AssertionError:\n    print('FAIL: assert sub_list([90,120],[50,70])==[40,50]')\n",
+            "sandbox_output": "PASS: assert sub_list([1,2],[3,4])==[-2,-2]\nPASS: assert sub_list([90,120],[50,70])==[40,50]\n",
+            "retries": 1,
+            "timestamp": "2026-07-09T09:49:39.153688"
+        }
+    ],
+    "error": null,
+    "timestamp": "2026-07-09T09:49:39.153688"
+}

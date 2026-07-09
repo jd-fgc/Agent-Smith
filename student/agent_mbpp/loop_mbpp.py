@@ -1,5 +1,7 @@
 from code_parser import extract_code, tool_call_reformer, ToolCall
-from MBPP_models import StepMetrics, SolutionOutput, MBPPTaskInput
+from models.MBPP_models import (StepMetrics, SolutionOutput, MBPPTaskInput,
+                                SandboxConfig)
+from models.Sandbox_models import Sandbox
 from tools import run_tests
 from agent_utils import load_model, load_keys, respond
 from openai import OpenAI, RateLimitError
@@ -36,14 +38,16 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                     max_iteration: int) -> SolutionOutput:
     current_key = 0
     iteration = 0
-    prompt = tasks.task_definition + f" The function is declared as follow: {tasks.function_definition}"+" Only give the function."
+    original_prompt = tasks.task_definition + f" The function is declared as follow: {tasks.function_definition}"+" Only give the function."
     key_usage = 0
     metrics = []
     success = False
     code = ""
+    config = SandboxConfig()
+    sandbox = Sandbox(config=config)
+    prompt = original_prompt
     while iteration < max_iteration and not success:
         try:
-            output = {"output": 1, "stderr": ""}
             start = time.time()
             answer = respond(client, model, prompt)
             request_time = round((time.time() - start) * 1000, 2)
@@ -55,13 +59,16 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                 tasks.test_list,
                 tasks.test_imports
             )
-            # A RAJOUTER ET A FAIRE:
-            # output = run_through_sandbox(script)
-            # DEVRAIT RETURN run_command()
-            if output["output"] != 0:
+            output = sandbox.execute(script)
+            if output["success"] is False:
                 iteration += 1
+                prompt = original_prompt + \
+                    "\n\nHere is your previously generated " + \
+                    f"function:\n{script}\n\n" + \
+                    f"And here is the terminal output:\n{output['output']}"
             else:
                 success = True
+            iteration += 1
             key_usage += 1
             if key_usage > 2:
                 current_key += 1
@@ -76,7 +83,7 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                 model_name=model,
                 llm_output=answer.choices[0].message.content,
                 sandbox_input=script,
-                sandbox_output="",
+                sandbox_output=output["output"],
                 retries=iteration
             ))
         except (RateLimitError, Exception) as e:
@@ -116,7 +123,7 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
         total_output_tokens=sum(inputs.output_tokens for inputs in metrics),
         total_time_seconds=sum(inputs.request_time_ms for inputs in metrics),
         steps=metrics,
-        error=output["stderr"] if output["stderr"] else None
+        error=output["output"] if success is False else None
     )
     return solution
 
