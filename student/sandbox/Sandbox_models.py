@@ -6,6 +6,7 @@ from mcp.client.streamable_http import streamablehttp_client
 import multiprocessing
 from pathlib import Path
 
+import socket
 import resource
 import sys
 import io
@@ -15,9 +16,17 @@ from pydantic import BaseModel, Field
 from typing import List
 
 
+def block_network():
+    def blocked(*args, **kwargs):
+        raise PermissionError("Network access denied")
+
+    socket.socket = blocked
+
+
 def worker(code, namespace, result_queue, max_memory_mb):
     restricted_memory = max_memory_mb * 1024 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (restricted_memory, restricted_memory))
+    block_network()
 
     captured_stdout = io.StringIO()
     sys.stdout = captured_stdout
@@ -87,7 +96,8 @@ class Sandbox:
             command, *args = self.mcp_stdio.split()
             params = StdioServerParameters(command=command, args=args)
             read, write = await self._exit_stack.enter_async_context(
-                stdio_client(params))
+                stdio_client(params)
+            )
         elif self.mcp_url:
             read, write, _ = await self._exit_stack.enter_async_context(
                 streamablehttp_client(self.mcp_url)
@@ -180,7 +190,7 @@ class Sandbox:
 
         process = multiprocessing.Process(
             target=worker,
-            args=(code, namespace, result_queue, self.config.max_memory_mb)
+            args=(code, namespace, result_queue, self.config.max_memory_mb),
         )
         process.start()
         process.join(timeout=self.config.max_execution_time_seconds)
@@ -189,5 +199,8 @@ class Sandbox:
             return {"success": False, "output": "TIMEOUT"}
         else:
             if result_queue.empty():
-                return {"success": False, "output": f"PROCESS KILLED (exitcode: {process.exitcode})"}
+                return {
+                    "success": False,
+                    "output": f"PROCESS KILLED (exitcode: {process.exitcode})",
+                }
             return result_queue.get()
