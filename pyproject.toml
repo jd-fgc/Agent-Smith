@@ -12,3 +12,15 @@ dependencies = [
     "requests>=2.34.2",
     "uv>=0.11.25",
 ]
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["student"]
+
+[project.scripts]
+sandbox = "student.__main__:main"
