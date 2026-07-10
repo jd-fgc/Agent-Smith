@@ -3,6 +3,8 @@ student/
     agent/
         agent_mbpp.py        # CLI + boucle agent MBPP
         agent_swebench.py    # CLI + boucle agent SWE-bench
+        utils/
+            utils.py         # utilitaire des agents
     sandbox/
         sandbox.py           # classe Sandbox + worker
     mcp/

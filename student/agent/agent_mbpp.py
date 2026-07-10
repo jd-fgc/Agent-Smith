@@ -1,9 +1,15 @@
-from code_parser import extract_code, tool_call_reformer, ToolCall
-from models.MBPP_models import (StepMetrics, SolutionOutput, MBPPTaskInput,
-                                SandboxConfig)
-from models.Sandbox_models import Sandbox
-from tools import run_tests
-from agent_utils import load_model, load_keys, respond
+from .agent_utils.utils import (
+    extract_code,
+    tool_call_reformer,
+    ToolCall,
+    load_model,
+    load_keys,
+    respond,
+)
+from ..models.mbpp_models import StepMetrics, SolutionOutput, MBPPTaskInput
+from ..models.sandbox_config import SandboxConfig
+from ..sandbox.Sandbox_models import Sandbox
+from ..mcp.tools.execution_tools import run_tests
 from openai import OpenAI, RateLimitError
 from typing import Any
 import time

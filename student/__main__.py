@@ -1,21 +1,21 @@
-import argparse
-import asyncio
+# import argparse
+# import asyncio
 
 
-def REPL():
-    while True:
-        try:
-            code = input(">>> ")
-            if code == "exit":
-                break
-            result = await sandbox.execute(code)
-            print(result["output"])
-        except EOFError:
-            break
+# def REPL():
+#     while True:
+#         try:
+#             code = input(">>> ")
+#             if code == "exit":
+#                 break
+#             result = await sandbox.execute(code)
+#             print(result["output"])
+#         except EOFError:
+#             break
 
 
 def main():
-    print("Hello from agent-smith!")
+    pass
 
 
 if __name__ == "__main__":
