@@ -1,4 +1,4 @@
-from models.SWE_models import SWEBenchTaskInput, StepMetrics, SolutionOutput
+from ..models.swe_models import SWEBenchTaskInput, StepMetrics, SolutionOutput
 from agent_utils import load_keys, load_model, respond, load_tools, Tool
 from openai import OpenAI, RateLimitError
 from code_parser import ToolCall, tool_call_reformer, extract_code
@@ -107,7 +107,6 @@ def build_history(tool: str, observation: str) -> dict[str, Any]:
     return result
 
 
-
 def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                         keys: list[str], client: OpenAI,
                         max_iteration: int) -> SolutionOutput:
@@ -130,12 +129,12 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                 code = tool_call_reformer(code)
             print(code)
             iteration += 1
-        except(RateLimitError, Exception) as e:
+        except (RateLimitError, Exception) as e:
             print(e)
             iteration += 1
 
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     task = SWEBenchTaskInput(
         instance_id="1",
         problem_statement="The function add(a: int, b: int) does not return anything",
