@@ -8,7 +8,7 @@ from .agent_utils.utils import (
 )
 from ..models.mbpp_models import StepMetrics, SolutionOutput, MBPPTaskInput
 from ..models.sandbox_config import SandboxConfig
-from ..sandbox.Sandbox_models import Sandbox
+from ..sandbox.sandbox import Sandbox
 from ..mcp.tools.execution_tools import run_tests
 from openai import OpenAI, RateLimitError
 from typing import Any
@@ -78,7 +78,7 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
             key_usage += 1
             if key_usage > 2:
                 current_key += 1
-                client.api_key=keys[current_key%len(keys)]
+                client.api_key = keys[current_key % len(keys)]
                 key_usage = 0
             metrics.append(StepMetrics(
                 step=len(metrics)+1,
@@ -99,7 +99,7 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
             iteration += 1
             if key_usage > 2:
                 current_key += 1
-                client.api_key=keys[current_key%len(keys)]
+                client.api_key = keys[current_key % len(keys)]
                 key_usage = 0
             metrics.append(StepMetrics(
                 step=len(metrics)+1,
