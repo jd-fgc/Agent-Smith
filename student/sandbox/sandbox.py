@@ -62,6 +62,8 @@ class Sandbox:
             read, write, _ = await self._exit_stack.enter_async_context(
                 streamablehttp_client(self.mcp_url)
             )
+        else:
+            return
 
         self.session = await self._exit_stack.enter_async_context(
             ClientSession(read, write)
@@ -144,23 +146,37 @@ class Sandbox:
 
         return namespace
 
-    async def execute(self, code):
-        namespace = self._build_namespace()
-        result_queue = multiprocessing.Queue()
+    async def execute(self, code, namespace=None, repl_mode=False):
+        if namespace is None:
+            namespace = self._build_namespace()
 
-        process = multiprocessing.Process(
-            target=worker,
-            args=(code, namespace, result_queue, self.config.max_memory_mb),
-        )
-        process.start()
-        process.join(timeout=self.config.max_execution_time_seconds)
-        if process.is_alive():
-            process.terminate()
-            return {"success": False, "output": "TIMEOUT"}
+        if repl_mode:
+            captured_stdout = io.StringIO()
+            sys.stdout = captured_stdout
+            try:
+                exec(code, namespace)
+                output = captured_stdout.getvalue()
+                return {"success": True, "output": output}
+            except Exception as e:
+                return {"success": False, "output": str(e)}
+            finally:
+                sys.stdout = sys.__stdout__
         else:
-            if result_queue.empty():
-                return {
-                    "success": False,
-                    "output": f"PROCESS KILLED (exitcode: {process.exitcode})",
-                }
-            return result_queue.get()
+            result_queue = multiprocessing.Queue()
+
+            process = multiprocessing.Process(
+                target=worker,
+                args=(code, namespace, result_queue, self.config.max_memory_mb)
+            )
+            process.start()
+            process.join(timeout=self.config.max_execution_time_seconds)
+            if process.is_alive():
+                process.terminate()
+                return {"success": False, "output": "TIMEOUT"}
+            else:
+                if result_queue.empty():
+                    return {
+                        "success": False,
+                        "output": f"PROCESS KILLED (exitcode: {process.exitcode})",
+                    }
+                return result_queue.get()
