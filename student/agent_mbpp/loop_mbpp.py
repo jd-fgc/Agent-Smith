@@ -38,7 +38,9 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                     max_iteration: int) -> SolutionOutput:
     current_key = 0
     iteration = 0
-    original_prompt = tasks.task_definition + f" The function is declared as follow: {tasks.function_definition}"+" Only give the function."
+    original_prompt = tasks.task_definition + \
+        f" The function is declared as follow: {tasks.function_definition}" +\
+        " Only give the function."
     key_usage = 0
     metrics = []
     success = False
@@ -71,10 +73,10 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
             key_usage += 1
             if key_usage > 2:
                 current_key += 1
-                client.api_key=keys[current_key%len(keys)]
+                client.api_key = keys[current_key % len(keys)]
                 key_usage = 0
             metrics.append(StepMetrics(
-                step=len(metrics)+1,
+                step=len(metrics) + 1,
                 input_tokens=answer.usage.prompt_tokens,
                 output_tokens=answer.usage.completion_tokens,
                 request_time_ms=request_time,
@@ -91,10 +93,10 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
             key_usage += 1
             if key_usage > 2:
                 current_key += 1
-                client.api_key=keys[current_key%len(keys)]
+                client.api_key = keys[current_key % len(keys)]
                 key_usage = 0
             metrics.append(StepMetrics(
-                step=len(metrics)+1,
+                step=len(metrics) + 1,
                 input_tokens=0,
                 output_tokens=0,
                 request_time_ms=request_time,

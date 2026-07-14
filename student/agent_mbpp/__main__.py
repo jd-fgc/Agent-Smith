@@ -30,7 +30,7 @@ def convert_to_dict(solution: SolutionOutput) -> dict[str, Any]:
         steps.append(dict(metric))
     output["steps"] = steps
     return output
-        
+
 
 def main():
     try:
