@@ -2,7 +2,8 @@ from typing import Dict, List
 import subprocess
 
 
-def run_tests(solution_code: str, test_list: List[str], test_imports: List[str]) -> str:
+def run_tests(solution_code: str, test_list: List[str],
+              test_imports: List[str]) -> str:
     script = ""
     imp = ""
     tests = ""
@@ -34,7 +35,7 @@ def get_patch() -> Dict[str, str | int]:
     }
 
 
-def run_command(command, workdir) -> Dict[str, str | int]:
+def run_command(command: str, workdir: str) -> Dict[str, str | int]:
     sub = subprocess.run(command,
                          shell=True,
                          cwd=workdir,

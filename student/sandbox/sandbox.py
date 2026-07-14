@@ -1,24 +1,28 @@
-import asyncio
+from ..models.sandbox_config import SandboxConfig
+from typing import Any, Optional
 from contextlib import AsyncExitStack
-from mcp import ClientSession, StdioServerParameters
+from mcp.client.session import ClientSession
 from mcp.client.stdio import stdio_client
+from mcp.types import StdioServerParameters
 from mcp.client.streamable_http import streamablehttp_client
-import multiprocessing
 from pathlib import Path
-import socket
+import multiprocessing
 import resource
+import asyncio
+import socket
 import sys
 import io
 
 
-def block_network():
-    def blocked(*args, **kwargs):
+def block_network() -> None:
+    def blocked(*args: Any, **kwargs: Any) -> None:
         raise PermissionError("Network access denied")
 
-    socket.socket = blocked
+    socket.socket = blocked  # type: ignore[misc, assignment]
 
 
-def worker(code, namespace, result_queue, max_memory_mb):
+def worker(code: str, namespace: dict[str, Any],
+           result_queue: multiprocessing.Queue[dict[str, Any]], max_memory_mb: int) -> None:
     restricted_memory = max_memory_mb * 1024 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (restricted_memory,
                                             restricted_memory))
@@ -40,16 +44,16 @@ def worker(code, namespace, result_queue, max_memory_mb):
 
 
 class Sandbox:
-    def __init__(self, config, mcp_stdio=None, mcp_url=None):
+    def __init__(self, config: SandboxConfig, mcp_stdio: str | None = None, mcp_url: str | None = None) -> None:
         self.config = config
         self.mcp_stdio = mcp_stdio
         self.mcp_url = mcp_url
-        self.tools = {}
-        self.session = None
-        self._exit_stack = None
-        self.answer = None
+        self.tools: dict[str, Any] = {}
+        self.session: Optional[ClientSession] = None
+        self._exit_stack: Optional[AsyncExitStack] = None
+        self.answer: Optional[str] = None
 
-    async def connect(self):
+    async def connect(self) -> None:
         self._exit_stack = AsyncExitStack()
 
         if self.mcp_stdio:
@@ -68,22 +72,24 @@ class Sandbox:
         self.session = await self._exit_stack.enter_async_context(
             ClientSession(read, write)
         )
+        assert self.session is not None
         await self.session.initialize()
 
         tools = await self.session.list_tools()
         for tool in tools.tools:
             self.tools[tool.name] = tool
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
+        assert self._exit_stack is not None
         await self._exit_stack.aclose()
 
-    def safe_import(self, name, *args, **kwargs):
+    def safe_import(self, name: str, *args: Any, **kwargs: Any) -> Any:
         if name in self.config.authorized_imports:
             return __import__(name, *args, **kwargs)
         else:
             raise ImportError(f"Import '{name}' not autorised")
 
-    def safe_open(self, filepath, *args, **kwargs):
+    def safe_open(self, filepath: str, *args: Any, **kwargs: Any) -> Any:
         path = Path(filepath).resolve()
 
         for allowed in self.config.allowed_directories:
@@ -91,16 +97,16 @@ class Sandbox:
                 return open(filepath, *args, **kwargs)
         raise PermissionError(f"ACCESS DENIED: {filepath}")
 
-    def _make_tool_wrapper(self, tool_name):
-        def wrapper(**kwargs):
-            return asyncio.run(self.session.call_tool(tool_name, kwargs))
+    def _make_tool_wrapper(self, tool_name: str) -> Any:
+        def wrapper(**kwargs: Any) -> Any:
+            return asyncio.run(self.session.call_tool(tool_name, kwargs))  # type: ignore[union-attr]
 
         return wrapper
 
-    def _final_answer(self, answer):
+    def _final_answer(self, answer: str) -> None:
         self.answer = answer
 
-    def _build_namespace(self):
+    def _build_namespace(self) -> dict[str, Any]:
         namespace = {}
 
         namespace["__builtins__"] = {
@@ -142,11 +148,12 @@ class Sandbox:
         for tools_name in self.tools:
             namespace[tools_name] = self._make_tool_wrapper(tools_name)
 
-        namespace["final_answer"] = self._final_answer
+        namespace["final_answer"] = self._final_answer  # type: ignore[assignment]
 
         return namespace
 
-    async def execute(self, code, namespace=None, repl_mode=False):
+    async def execute(self, code: str, namespace: dict[str, Any] | None = None,
+                      repl_mode: bool = False) -> dict[str, Any]:
         if namespace is None:
             namespace = self._build_namespace()
 
@@ -162,7 +169,7 @@ class Sandbox:
             finally:
                 sys.stdout = sys.__stdout__
         else:
-            result_queue = multiprocessing.Queue()
+            result_queue: multiprocessing.Queue[dict[str, Any]] = multiprocessing.Queue()
 
             process = multiprocessing.Process(
                 target=worker,
@@ -177,6 +184,7 @@ class Sandbox:
                 if result_queue.empty():
                     return {
                         "success": False,
-                        "output": f"PROCESS KILLED (exitcode: {process.exitcode})",
+                        "output": f"PROCESS KILLED (exitcode: \
+{process.exitcode})",
                     }
                 return result_queue.get()

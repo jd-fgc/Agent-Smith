@@ -50,15 +50,17 @@ def tool_find_references(name: str, filepath: str, line: int) -> str:
 
 
 @mcp.tool()
-def tool_get_patch():
+def tool_get_patch() -> str:
     result = get_patch()
-    return f"stdout: {result['stdout']}\nstderr: {result['stderr']}\nexitcode: {result['output']}"
+    return f"stdout: {result['stdout']}\nstderr: \
+{result['stderr']}\nexitcode: {result['output']}"
 
 
 @mcp.tool()
-def tool_run_command(command: str, workdir: str):
+def tool_run_command(command: str, workdir: str) -> str:
     result = run_command(command, workdir)
-    return f"stdout: {result['stdout']}\nstderr: {result['stderr']}\nexitcode: {result['output']}"
+    return f"stdout: {result['stdout']}\nstderr: \
+{result['stderr']}\nexitcode: {result['output']}"
 
 
 if __name__ == "__main__":

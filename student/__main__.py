@@ -1,3 +1,4 @@
+from typing import Any
 from argparse import ArgumentParser
 from .models.sandbox_config import SandboxConfig
 from .sandbox.sandbox import Sandbox
@@ -6,7 +7,7 @@ import asyncio
 from json import load
 
 
-def sanitize_config(config):
+def sanitize_config(config: SandboxConfig) -> SandboxConfig:
     if config.max_memory_mb <= 50 or config.max_memory_mb >= 4096:
         config.max_memory_mb = 512
 
@@ -15,10 +16,13 @@ def sanitize_config(config):
     elif config.max_execution_time_seconds >= 900:
         config.max_execution_time_seconds = 900
 
-    import_unauthorized = ["os", "sys", "subprocess", "shutil", "socket", "ctypes", "importlib", "builtins", "pickle"]
-    config.authorized_imports = [imp for imp in config.authorized_imports if imp not in import_unauthorized]
+    import_unauthorized = ["os", "sys", "subprocess", "shutil", "socket",
+                           "ctypes", "importlib", "builtins", "pickle"]
+    config.authorized_imports = [(imp for imp in config.authorized_imports if
+                                  imp not in import_unauthorized)]
 
-    system_dirs = ["/etc", "/bin", "/sbin", "/usr", "/boot", "/root", "/proc", "/sys", "/dev"]
+    system_dirs = ["/etc", "/bin", "/sbin", "/usr", "/boot",
+                   "/root", "/proc", "/sys", "/dev"]
     config.allowed_directories = [
         d for d in config.allowed_directories
         if not any(d.startswith(sys_dir) for sys_dir in system_dirs)
@@ -27,7 +31,8 @@ def sanitize_config(config):
     return config
 
 
-async def repl(config, mcp_stdio=None, mcp_url=None):
+async def repl(config: SandboxConfig, mcp_stdio: str | None = None,
+               mcp_url: str | None = None) -> None:
     sandbox = Sandbox(config=config, mcp_stdio=mcp_stdio, mcp_url=mcp_url)
     await sandbox.connect()
     namespace = sandbox._build_namespace()
@@ -47,12 +52,12 @@ async def repl(config, mcp_stdio=None, mcp_url=None):
     await sandbox.disconnect()
 
 
-def load_file(file: str) -> None:
+def load_file(file: str) -> Any:
     with open(file, "r") as f:
         return load(f)
 
 
-def do_args():
+def do_args() -> ArgumentParser:
     parser = ArgumentParser(
         prog="uv run",
         description="A project by Nisalmon and Jogamber",
@@ -76,7 +81,7 @@ def do_args():
     return parser
 
 
-def main():
+def main() -> None:
     try:
         parser = do_args()
         args = parser.parse_args()
@@ -91,7 +96,8 @@ def main():
                 exit(1)
         else:
             config = SandboxConfig()
-            asyncio.run(repl(config, mcp_stdio=args.mcp_stdio, mcp_url=args.mcp_server))
+        asyncio.run(repl(config, mcp_stdio=args.mcp_stdio,
+                         mcp_url=args.mcp_server))
     except Exception as e:
         print(e)
 
