@@ -113,6 +113,7 @@ class Sandbox:
             "KeyError": KeyError,
             "IndexError": IndexError,
             "StopIteration": StopIteration,
+            "AssertionError": AssertionError
         }
 
         for tools_name in self.tools:

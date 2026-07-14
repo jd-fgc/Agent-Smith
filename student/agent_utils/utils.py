@@ -85,6 +85,18 @@ def load_tools() -> dict[str, Tool]:
         signature="run_command(command: str, workdir: str)",
         description="Run the command given as parameter in workdir"
     ))
+    Tools.append(Tool(
+        name="finish_exploration",
+        signature="finish_exploration()",
+        description="Call this when you have gathered enough information " + \
+            "and are ready to start editing."
+    ))
+    Tools.append(Tool(
+        name="finish_editing",
+        signature="finish_editing()",
+        description="Use this tool only when you believe the " + \
+            "implementation is complete and no further file edits are needed."
+    ))
 
     for tool in Tools:
         result[tool.name] = tool

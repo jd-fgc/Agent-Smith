@@ -3,8 +3,8 @@ from agent_utils import load_keys, load_model, respond, load_tools, Tool
 from openai import OpenAI, RateLimitError
 from code_parser import ToolCall, tool_call_reformer, extract_code
 from typing import Any
+import time
 import json
-import docker
 
 
 class Phases:
@@ -18,16 +18,29 @@ class Phases:
                 "list_files",
                 "search_code",
                 "search_function_or_class_definition_in_code",
-                "find_references",
-                "run_command"
+                "run_command",
+                "finish_exploration"
             ]
         elif self.phase == "edit":
             return [
+                "read_file",
+                "list_files",
+                "search_code",
+                "search_function_or_class_definition_in_code",
+                "run_command",
                 "edit_file",
-                "run_tests"
+                "run_tests",
+                "finish_editing"
             ]
         elif self.phase == "patch":
             return [
+                "read_file",
+                "list_files",
+                "search_code",
+                "search_function_or_class_definition_in_code",
+                "run_command",
+                "edit_file",
+                "run_tests",
                 "get_patch"
             ]
         else:
@@ -67,8 +80,8 @@ def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[s
 
         prompt.append("Observation:\n")
         prompt.append(step["observation"]["result"])
-    prompt.append("Choose exactly ONE tool.")
-    prompt.append("Here are the available tools\n")
+    prompt.append("Choose exactly ONE function.")
+    prompt.append("Here are the available functions\n")
     for tool in tools:
         try:
             prompt.append(f"- {tools_def[tool].signature}")
@@ -80,8 +93,14 @@ def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[s
         prompt.append(f"{task.hints_text}\n")
     prompt.append("Never assume file names")
     prompt.append("Don't add unnecessary text. Be consise.")
-    prompt.append("Respond only with a single tool call")
-    prompt.append("Answer in JSON format")
+    prompt.append("Return ONLY ONE valid JSON using the following schema.")
+    prompt.append("Schema:")
+    prompt.append("{")
+    prompt.append("\t'tool': '<tool_name>',")
+    prompt.append("\t'arguments': '{")
+    prompt.append("\t...")
+    prompt.append("\t}")
+    prompt.append("}")
     return "\n".join(prompt)
 
 
@@ -107,44 +126,166 @@ def build_history(tool: str, observation: str) -> dict[str, Any]:
     return result
 
 
+def build_eval_script(script: str, file_path: str) -> None:
+    try:
+        with open(file_path, "w") as file:
+            file.write(script)
+    except Exception:
+        raise Exception("An error occured during the creation of the script.")
+
+
 
 def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                         keys: list[str], client: OpenAI,
-                        max_iteration: int) -> SolutionOutput:
+                        max_iteration: int, sandbox) -> SolutionOutput:
     agent_phase = Phases()
     current_key = 0
     key_usage = 0
     metrics = []
     history = []
     success = False
+    patch = ""
     iteration = 0
     tools = load_tools()
+    build_eval_script(tasks.eval_script, "./script.sh")
     while iteration < max_iteration and success is False:
         available_func = agent_phase.get_possible_func()
+        iteration += 1
         try:
+            tool_call = ""
+            tool_result = {}
             message = build_prompt(tasks, available_func, history, agent_phase.phase, tools)
+            start = time.time()
             answer = respond(client, model, message)
-            print(answer.choices[0].message.content)
-            code = extract_code(answer.choices[0].message.content)
-            if isinstance(code, ToolCall):
-                code = tool_call_reformer(code)
-            print(code)
-            iteration += 1
+            request_time = round((time.time() - start) * 1000, 2)
+            raw_response = answer.choices[0].message.content
+            code = extract_code(raw_response)
+            if not isinstance(code, ToolCall):
+                history.append({
+                    "action": {
+                        "tool": "invalid",
+                        "args": {}
+                    },
+                    "observation": {
+                        "result": raw_response
+                    }
+                })
+                metrics.append(StepMetrics(
+                    step=len(metrics)+1,
+                    input_tokens=answer.usage.prompt_tokens,
+                    output_tokens=answer.usage.completion_tokens,
+                    request_time_ms=request_time,
+                    api_url=str(client.base_url),
+                    model_name=model,
+                    llm_output=raw_response,
+                    sandbox_input="",
+                    sandbox_output="",
+                    retries=iteration
+                ))
+                continue
+            tool_call = tool_call_reformer(code)
+            if code.tool == "finish_exploration":
+                agent_phase.phase = "edit"
+                tool_result["output"] = "Switching to edit mode"
+            elif code.tool == "finish_editing":
+                agent_phase.phase = "patch"
+                tool_result["output"] = "Switching to patch mode"
+            else:
+                tool_result = sandbox.execute(tool_call)
+            if code.tool == "get_patch":
+                if tool_result["output"].strip():
+                    success = True
+                    patch = tool_result
+                    metrics.append(StepMetrics(
+                        step=len(metrics)+1,
+                        input_tokens=answer.usage.prompt_tokens,
+                        output_tokens=answer.usage.completion_tokens,
+                        request_time_ms=request_time,
+                        api_url=str(client.base_url),
+                        model_name=model,
+                        llm_output=raw_response,
+                        sandbox_input=tool_call,
+                        sandbox_output=tool_result["output"],
+                        retries=iteration
+                    ))
+                    break
+                else:
+                    history.append({
+                        "action": {
+                            "tool": "get_patch",
+                            "args": {}
+                        },
+                        "observation": {
+                            "result": "The git diff is empty. No changes have been made yet."
+                        }
+                    })
+                    metrics.append(StepMetrics(
+                        step=len(metrics)+1,
+                        input_tokens=answer.usage.prompt_tokens,
+                        output_tokens=answer.usage.completion_tokens,
+                        request_time_ms=request_time,
+                        api_url=str(client.base_url),
+                        model_name=model,
+                        llm_output=raw_response,
+                        sandbox_input=tool_call,
+                        sandbox_output=tool_result["output"],
+                        retries=iteration
+                    ))
+                    continue
+            history.append({
+                "action": {
+                    "tool": code.tool,
+                    "args": code.arguments
+                },
+                "observation": {
+                    "result": tool_result
+                }
+            })
+            metrics.append(StepMetrics(
+                step=len(metrics)+1,
+                input_tokens=answer.usage.prompt_tokens,
+                output_tokens=answer.usage.completion_tokens,
+                request_time_ms=request_time,
+                api_url=str(client.base_url),
+                model_name=model,
+                llm_output=raw_response,
+                sandbox_input=tool_call,
+                sandbox_output=tool_result["output"],
+                retries=iteration
+            ))
         except(RateLimitError, Exception) as e:
+            request_time = round((time.time() - start) * 1000, 2)
             print(e)
-            iteration += 1
+            metrics.append(StepMetrics(
+                step=len(metrics) + 1,
+                input_tokens=0,
+                output_tokens=0,
+                request_time_ms=request_time,
+                api_url=str(client.base_url),
+                model_name=model,
+                llm_output="",
+                sandbox_input="",
+                sandbox_output="",
+                retries=iteration
+                ))
+    return SolutionOutput(
+        task_id=task.instance_id,
+        benchmark="swebench",
+        success=success,
+        solution=patch,
+        iterations=iteration,
+        total_requests=len(metrics),
+        total_input_tokens=sum(inputs.input_tokens for inputs in metrics),
+        total_output_tokens=sum(inputs.output_tokens for inputs in metrics),
+        total_time_seconds=sum(inputs.request_time_ms for inputs in metrics),
+        steps=metrics,
+        system_prompt=message
+    )
 
 
 if __name__ =="__main__":
-    task = SWEBenchTaskInput(
-        instance_id="1",
-        problem_statement="The function add(a: int, b: int) does not return anything",
-        docker_image="BBBBB",
-        eval_script="CCCCC",
-        hints_text="DDDDD",
-        repo="EEEEE"
-    )
+    task = load_task("../cache/SWE.json")
     keys = load_keys()
     client = load_model(keys[0], "https://openrouter.ai/api/v1")
     model = "poolside/laguna-xs-2.1:free"
-    agent_loop_swebench(task, model, keys, client, 1)
+    agent_loop_swebench(task, model, keys, client, 1, sandbox="")

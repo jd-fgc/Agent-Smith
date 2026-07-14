@@ -2,24 +2,29 @@ from pydantic import BaseModel
 import json
 import ast
 import xml.etree.ElementTree as ET
+from typing import Any
+import re
 
 
 class ToolCall(BaseModel):
     tool: str
-    arguments: dict[str, str]
+    arguments: dict[str, Any]
 
 
 def extract_code(text: str) -> str | ToolCall:
     if text.startswith("{"):
         return dict_format(text)
-    elif "```" in text:
-        return python_block(text)
     elif "<tool_call>" in text:
         return JSON_block(text)
     elif "<invoke" in text:
         return XML_block(text)
     elif "Action:" in text:
         return ReAct_block(text)
+    elif "```" in text:
+        code = python_block(text)
+        if code.startswith("{"):
+            return dict_format(code)
+        return code
     else:
         return text
 
@@ -83,16 +88,33 @@ def XML_block(text: str) -> ToolCall:
 
 
 def JSON_block(text: str) -> ToolCall:
-    content = text.split("<tool_call>", 1)[1].split("</tool_call>", 1)[0].strip()
-    try:
-        data = json.loads(content)
-    except Exception:
-        data = ast.literal_eval(content)
-    
+    content = text.split("<tool_call>", 1)[1]
+    if "<arg_key>" not in text:
+        if "</tool_call>" in text:
+            content = content.split("</tool_call>", 1)[0].strip()
+        try:
+            data = json.loads(content)
+        except Exception:
+            data = ast.literal_eval(content)
+    else:
+        name = content.split("<arg_key>", 1)[0].strip()
+        data = {
+            "name": name,
+            "arguments": {}
+        }
+        pairs = re.findall(
+            r"<arg_key>(.*?)</arg_key>\s*<arg_value>(.*?)</arg_value>",
+            content,
+            re.DOTALL
+        )
+        for key, value in pairs:
+            data["arguments"][key.strip()] = value.strip()
     return ToolCall(
-        tool=data["name"],
-        arguments=data.get("arguments", {})
-    )
+            tool=data["name"],
+            arguments=data.get("arguments", {})
+        )
+
+
 
 
 def tool_call_reformer(call: ToolCall) -> str:
@@ -129,21 +151,18 @@ def dict_format(text: str) -> ToolCall:
 
 
 # if __name__ == "__main__":
-    # code = "```python\n" + \
-    # "def addition(a, b):\n" + \
-    # "   return a + b\n" + \
-    # "```"
-    # code = "Action: calculator\n" + \
-    #     "Action Input:\n" + \
-    #     "{\n" + \
-    #         '"expression": "2+2"\n' + \
-    #     "}"
-    # code = '<invoke name="search">\n' + \
-    #         '<parameter name="query">Paris weather</parameter>\n' + \
-    #         '</invoke>'
-    # extracted_code = extract_code(code)
-    # if isinstance(extracted_code, ToolCall):
-    #     result = tool_call_reformer(extracted_code)
-    #     print(result)
-    # else:
-    #     print(extracted_code)
+#     test = """
+#     Bien sûr je vais répondre...
+#     <tool_call>
+#     read_file
+#     <arg_key>tool</arg_key>
+#     <arg_value>search_function_or_class_definition_in_code</arg_value>
+#     <arg_key>name</arg_key>
+#     <arg_value>RenameContentType</arg_value>
+#     """
+#     extracted_code = extract_code(test)
+#     if isinstance(extracted_code, ToolCall):
+#         result = tool_call_reformer(extracted_code)
+#         print(result)
+#     else:
+#         print(extracted_code)

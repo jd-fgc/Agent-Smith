@@ -60,11 +60,10 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                 tasks.test_imports
             )
             output = sandbox.execute(script)
-            if output["success"] is False:
-                iteration += 1
+            if output["success"] is False or "FAIL" in output["output"]:
                 prompt = original_prompt + \
                     "\n\nHere is your previously generated " + \
-                    f"function:\n{script}\n\n" + \
+                    f"function:\n{code}\n\n" + \
                     f"And here is the terminal output:\n{output['output']}"
             else:
                 success = True
@@ -90,7 +89,6 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
             request_time = round((time.time() - start) * 1000, 2)
             print(e)
             key_usage += 1
-            iteration += 1
             if key_usage > 2:
                 current_key += 1
                 client.api_key=keys[current_key%len(keys)]
@@ -107,6 +105,7 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                 sandbox_output="",
                 retries=iteration
             ))
+            iteration += 1
             if iteration >= max_iteration:
                 break
             print("Retrying in 10 seconds...")
