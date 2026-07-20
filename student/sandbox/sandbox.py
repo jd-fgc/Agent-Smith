@@ -7,12 +7,14 @@ from mcp.client.stdio import stdio_client
 from mcp import StdioServerParameters
 from mcp.client.streamable_http import streamablehttp_client
 from pathlib import Path
+import nest_asyncio
 import multiprocessing
 import resource
 import asyncio
 import socket
 import sys
 import io
+nest_asyncio.apply()
 
 
 def block_network() -> None:
@@ -100,8 +102,13 @@ class Sandbox:
 
     def _make_tool_wrapper(self, tool_name: str) -> Any:
         def wrapper(**kwargs: Any) -> Any:
-            return asyncio.run(self.session.call_tool(tool_name, kwargs))  # type: ignore[union-attr]
-
+            loop = asyncio.get_event_loop()
+            result = loop.run_until_complete(
+                self.session.call_tool(tool_name, kwargs)  # type: ignore[union-attr]
+            )
+            if result.content:
+                return result.content[0].text
+            return ""
         return wrapper
 
     def _final_answer(self, answer: str) -> None:
