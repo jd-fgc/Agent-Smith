@@ -1,9 +1,10 @@
+from __future__ import annotations
 from ..models.sandbox_config import SandboxConfig
 from typing import Any, Optional
 from contextlib import AsyncExitStack
 from mcp.client.session import ClientSession
 from mcp.client.stdio import stdio_client
-from mcp.types import StdioServerParameters
+from mcp import StdioServerParameters
 from mcp.client.streamable_http import streamablehttp_client
 from pathlib import Path
 import multiprocessing

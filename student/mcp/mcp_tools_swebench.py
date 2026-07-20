@@ -19,6 +19,14 @@ def tool_read_file(filepath: str, start_line: int, end_line: int) -> str:
     return "\n".join(result)
 
 
+# # avec Docker
+# @mcp.tool()
+# def tool_read_file(filepath, start_line, end_line):
+#     cmd = f"docker exec {CONTAINER_ID} cat -n {filepath}"
+#     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+#     return result.stdout
+
+
 @mcp.tool()
 def tool_edit_file(filepath: str, old_str: str, new_str: str) -> None:
     edit_file(filepath, old_str, new_str)
