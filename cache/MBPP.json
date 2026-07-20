@@ -1,10 +1,10 @@
 {
-  "task_id": 299,
-  "task_definition": "Write a function to calculate the maximum aggregate from the list of tuples.",
-  "function_definition": "def max_aggregate(stdata):",
+  "task_id": 240,
+  "task_definition": "Write a function to replace the last element of the list with another list.",
+  "function_definition": "def replace_list(list1,list2):",
   "test_imports": [],
   "test_list": [
-    "assert max_aggregate([('Juan Whelan',50),('Sabah Colley',48),('Peter Nichols',37),('Juan Whelan',22),('Sabah Colley',14)])==('Juan Whelan', 72)",
-    "assert max_aggregate([('Juan Whelan',10),('Sabah Colley',20),('Peter Nichols',30),('Juan Whelan',40),('Sabah Colley',50)])==('Sabah Colley', 70)"
+    "assert replace_list([1,2,3,4,5],[5,6,7,8])==[1,2,3,4,5,6,7,8]",
+    "assert replace_list([\"red\",\"blue\",\"green\"],[\"yellow\"])==[\"red\",\"blue\",\"yellow\"]"
   ]
 }

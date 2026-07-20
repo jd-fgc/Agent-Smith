@@ -3,9 +3,11 @@ from models.MBPP_models import (StepMetrics, SolutionOutput, MBPPTaskInput,
                                 SandboxConfig)
 from models.Sandbox_models import Sandbox
 from tools import run_tests
-from agent_utils import load_model, load_keys, respond
+from agent_utils import respond
 from openai import OpenAI, RateLimitError
+from openai.types.chat import ChatCompletion
 from typing import Any
+from token_count import TokenCount
 import time
 import json
 
@@ -33,6 +35,20 @@ def get_task_from_id(tasks: list[dict[str, Any]], id: int) -> dict[str, Any]:
     return {}
 
 
+def get_visible_tokens(answer: ChatCompletion):
+    usage = answer.usage
+    reasoning = 0
+    if hasattr(usage, "completion_tokens_details"):
+        details = usage.completion_tokens_details
+        if details is not None:
+            reasoning = details.reasoning_tokens or 0
+
+    if reasoning:
+        return usage.completion_tokens - reasoning
+
+    return None
+
+
 def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                     keys: list[str], client: OpenAI,
                     max_iteration: int) -> SolutionOutput:
@@ -48,11 +64,17 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
     config = SandboxConfig()
     sandbox = Sandbox(config=config)
     prompt = original_prompt
+    token_count = TokenCount()
     while iteration < max_iteration and not success:
         try:
             start = time.time()
             answer = respond(client, model, prompt)
             request_time = round((time.time() - start) * 1000, 2)
+            output_tokens = get_visible_tokens(answer)
+            if output_tokens is None:
+                output_tokens = token_count.num_tokens_from_string(
+                    answer.choices[0].message.content
+                )
             code = extract_code(answer.choices[0].message.content)
             if isinstance(code, ToolCall):
                 code = tool_call_reformer(code)
@@ -78,7 +100,7 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
             metrics.append(StepMetrics(
                 step=len(metrics) + 1,
                 input_tokens=answer.usage.prompt_tokens,
-                output_tokens=answer.usage.completion_tokens,
+                output_tokens=output_tokens,
                 request_time_ms=request_time,
                 api_url=str(client.base_url),
                 model_name=model,
@@ -122,19 +144,9 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
         total_requests=len(metrics),
         total_input_tokens=sum(inputs.input_tokens for inputs in metrics),
         total_output_tokens=sum(inputs.output_tokens for inputs in metrics),
-        total_time_seconds=sum(inputs.request_time_ms for inputs in metrics),
+        total_time_seconds=sum(inputs.request_time_ms/1000
+                               for inputs in metrics),
         steps=metrics,
         error=output["output"] if success is False else None
     )
     return solution
-
-
-if __name__ == "__main__":
-    client = load_model()
-    answered = False
-    tasks = load_tasks("./moulinette/evaluations/mbpp/2026-03-01_13-12-36/282/task.json")
-    if not tasks:
-        print("Error when loading tasks")
-        exit()
-    keys = load_keys()
-    agent_loop_mbpp(tasks, "google/gemma-4-26b-a4b-it:free", keys)
