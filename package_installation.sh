@@ -4,7 +4,7 @@ export PIP_CACHE_DIR=/goinfre/$USER/.cache/pip
 export HF_HOME=/goinfre/$USER/.cache/huggingface
 export TRANSFORMERS_CACHE=/goinfre/$USER/.cache/huggingface
 export UV_CACHE_DIR=/goinfre/$USER/.cache/uv
-VENV=/goinfre/$USER/AS_VENV
+VENV=/goinfre/$USER/.VENV
 
 
 mkdir -p "$PIP_CACHE_DIR" "$HF_HOME" "$UV_CACHE_DIR"

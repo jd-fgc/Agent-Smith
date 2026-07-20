@@ -34,4 +34,3 @@ class DockerSandbox:
         if self.container:
             self.container.remove(force=True)
             self.container = None
-

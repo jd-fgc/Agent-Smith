@@ -7,6 +7,7 @@ from tools.code_search_tools import (
     find_references,
 )
 from tools.execution_tools import get_patch, run_command
+from asyncio import CancelledError
 
 
 mcp = FastMCP("agent-smith")
@@ -16,6 +17,14 @@ mcp = FastMCP("agent-smith")
 def tool_read_file(filepath: str, start_line: int, end_line: int) -> str:
     result = read_file(filepath, start_line, end_line)
     return "\n".join(result)
+
+
+# # avec Docker
+# @mcp.tool()
+# def tool_read_file(filepath, start_line, end_line):
+#     cmd = f"docker exec {CONTAINER_ID} cat -n {filepath}"
+#     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+#     return result.stdout
 
 
 @mcp.tool()
@@ -49,15 +58,17 @@ def tool_find_references(name: str, filepath: str, line: int) -> str:
 
 
 @mcp.tool()
-def tool_get_patch():
+def tool_get_patch() -> str:
     result = get_patch()
-    return f"stdout: {result['stdout']}\nstderr: {result['stderr']}\nexitcode: {result['output']}"
+    return f"stdout: {result['stdout']}\nstderr: \
+{result['stderr']}\nexitcode: {result['output']}"
 
 
 @mcp.tool()
-def tool_run_command(command: str, workdir: str):
+def tool_run_command(command: str, workdir: str) -> str:
     result = run_command(command, workdir)
-    return f"stdout: {result['stdout']}\nstderr: {result['stderr']}\nexitcode: {result['output']}"
+    return f"stdout: {result['stdout']}\nstderr: \
+{result['stderr']}\nexitcode: {result['output']}"
 
 
 if __name__ == "__main__":
@@ -65,7 +76,12 @@ if __name__ == "__main__":
     parser.add_argument("--http", action="store_true")
     args = parser.parse_args()
 
-    if args.http:
-        mcp.run(transport="streamable-http")
-    else:
-        mcp.run()
+    try:
+        if args.http:
+            mcp.run(transport="streamable-http")
+        else:
+            mcp.run()
+    except (KeyboardInterrupt, CancelledError):
+        print("\nServer stopped.")
+    except Exception as e:
+        print(f"Server error: {e}")

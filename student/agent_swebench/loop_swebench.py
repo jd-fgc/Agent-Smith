@@ -1,7 +1,7 @@
-from models.SWE_models import SWEBenchTaskInput, StepMetrics, SolutionOutput
-from agent_utils import load_keys, load_model, respond, load_tools, Tool
+from student.models.SWE_models import SWEBenchTaskInput, StepMetrics, SolutionOutput
+from student.agent_utils import load_keys, load_model, respond, load_tools, Tool
 from openai import OpenAI, RateLimitError
-from code_parser import ToolCall, tool_call_reformer, extract_code
+from ..code_parser import ToolCall, tool_call_reformer, extract_code
 from typing import Any
 import time
 import json

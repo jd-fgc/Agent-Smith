@@ -40,45 +40,47 @@ def load_tools() -> dict[str, Tool]:
     result = {}
     Tools = []
     Tools.append(Tool(
-        name="read_file",
-        signature="read_file(filepath: str, start_line: int, end_line: int)",
-        description="Read the content of a file between start_line and" + \
-            " end_line."
+        name="tool_read_file",
+        signature="tool_read_file(filepath: str,"
+        "start_line: int, end_line: int)",
+        description="Read the content of a file between start_line and"
+        " end_line."
     ))
     Tools.append(Tool(
-        name="edit_file",
-        signature="edit_file(filepath: str, old_str: str, new_str: str)",
+        name="tool_edit_file",
+        signature="tool_edit_file(filepath: str, old_str: str, new_str: str)",
         description="Replace in a file every occurences of old_str by new_str"
     ))
     Tools.append(Tool(
-        name="list_files",
-        signature="list_files(directory: str, pattern: str)",
-        description="list all files in directory ending by pattern.\n" + \
-            "\tFor example list_files('./', '*.py') will list all files " + \
-            "in ./ ending by .py."
+        name="tool_list_files",
+        signature="tool_list_files(directory: str, pattern: str)",
+        description="list all files in directory ending by pattern.\n"
+        "\tFor example list_files('./', '*.py') will list all files "
+        "in ./ ending by .py."
     ))
     Tools.append(Tool(
-        name="search_code",
-        signature="search_code(pattern: str, file_pattern: str)",
-        description="Search for specific pattern of code in file ending " + \
-            "in file_pattern."
+        name="tool_search_code",
+        signature="tool_search_code(pattern: str, file_pattern: str)",
+        description="Search for specific pattern of code in file ending "
+        "in file_pattern."
     ))
     Tools.append(Tool(
-        name="search_function_or_class_definition_in_code",
-        signature="search_function_or_class_definition_in_code(name: str)",
-        description="Search in all files for the function, or class, " + \
-            "definition of name."
+        name="tool_search_function_or_class_definition_in_code",
+        signature="tool_search_function_or_class_definition_in_code"
+        "(name: str)",
+        description="Search in all files for the function, or class, "
+        "definition of name."
     ))
     Tools.append(Tool(
-        name="find_references",
-        signature="find_references(name: str, filepath: str, line: int)",
+        name="tool_find_references",
+        signature="tool_find_references(name: str, filepath: str, line: int)",
         description="Find references of name in filepath at line."
     ))
     Tools.append(Tool(
-        name="get_patch",
-        signature="get_patch()",
-        description="Run the following command git -c core.fileMode=false" + \
-            "diff and return the output."
+        name="tool_get_patch",
+        signature="tool_get_patch()",
+        description="Run the following command git -c core.fileMode=false"
+        "diff and return the output."
     ))
     Tools.append(Tool(
         name="run_command",
@@ -88,14 +90,14 @@ def load_tools() -> dict[str, Tool]:
     Tools.append(Tool(
         name="finish_exploration",
         signature="finish_exploration()",
-        description="Call this when you have gathered enough information " + \
-            "and are ready to start editing."
+        description="Call this when you have gathered enough information "
+        "and are ready to start editing."
     ))
     Tools.append(Tool(
         name="finish_editing",
         signature="finish_editing()",
-        description="Use this tool only when you believe the " + \
-            "implementation is complete and no further file edits are needed."
+        description="Use this tool only when you believe the "
+        "implementation is complete and no further file edits are needed."
     ))
 
     for tool in Tools:

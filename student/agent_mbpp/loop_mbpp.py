@@ -1,9 +1,9 @@
-from code_parser import extract_code, tool_call_reformer, ToolCall
-from models.MBPP_models import (StepMetrics, SolutionOutput, MBPPTaskInput,
-                                SandboxConfig)
-from models.Sandbox_models import Sandbox
-from tools import run_tests
-from agent_utils import respond
+from ..code_parser import extract_code, tool_call_reformer, ToolCall
+from ..models.MBPP_models import StepMetrics, SolutionOutput, MBPPTaskInput
+from ..models.sandbox_config import SandboxConfig
+from ..sandbox.sandbox import Sandbox
+from ..mcp.tools.execution_tools import run_tests
+from ..agent_utils import respond
 from openai import OpenAI, RateLimitError
 from openai.types.chat import ChatCompletion
 from typing import Any
@@ -49,9 +49,9 @@ def get_visible_tokens(answer: ChatCompletion):
     return None
 
 
-def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
-                    keys: list[str], client: OpenAI,
-                    max_iteration: int) -> SolutionOutput:
+async def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
+                          keys: list[str], client: OpenAI,
+                          max_iteration: int) -> SolutionOutput:
     current_key = 0
     iteration = 0
     original_prompt = tasks.task_definition + \
@@ -68,6 +68,7 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
     while iteration < max_iteration and not success:
         try:
             start = time.time()
+            print("Thinking")
             answer = respond(client, model, prompt)
             request_time = round((time.time() - start) * 1000, 2)
             output_tokens = get_visible_tokens(answer)
@@ -83,13 +84,16 @@ def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                 tasks.test_list,
                 tasks.test_imports
             )
-            output = sandbox.execute(script)
+            print("Running thought code")
+            output = await sandbox.execute(script)
             if output["success"] is False or "FAIL" in output["output"]:
+                print("Me fail, am a dum dum")
                 prompt = original_prompt + \
                     "\n\nHere is your previously generated " + \
                     f"function:\n{code}\n\n" + \
                     f"And here is the terminal output:\n{output['output']}"
             else:
+                print("Success, mi muscles are getting biger")
                 success = True
             iteration += 1
             key_usage += 1

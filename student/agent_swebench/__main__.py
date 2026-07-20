@@ -1,8 +1,7 @@
 import fire
-from models.DockerSandbox import DockerSandbox
-from agent_utils import load_keys, load_model
-from agent_swebench.loop_swebench import agent_loop_swebench, load_task
-
+from student.models.DockerSandbox import DockerSandbox
+from student.agent_utils import load_keys, load_model
+from student.agent_swebench.loop_swebench import agent_loop_swebench, load_task
 
 
 class Agent_SWE:
@@ -16,4 +15,16 @@ class Agent_SWE:
         )
         sandbox.start()
 
+        sandbox.stop()
 
+
+def main():
+    try:
+        pipou = Agent_SWE()
+        fire.Fire(pipou)
+    except Exception as e:
+        print(e)
+
+
+if __name__ == "__main__":
+    main()

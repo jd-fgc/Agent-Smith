@@ -1,7 +1,8 @@
-from agent_utils import load_keys, load_model
-from agent_mbpp.loop_mbpp import load_tasks, agent_loop_mbpp
-from models.MBPP_models import SolutionOutput
+from student.agent_utils import load_keys, load_model
+from student.agent_mbpp.loop_mbpp import load_tasks, agent_loop_mbpp
+from ..models.MBPP_models import SolutionOutput
 from typing import Any
+import asyncio
 import fire
 import json
 
@@ -9,7 +10,7 @@ import json
 class Agent_MBPP:
     def run_agent(self, task_file: str, output: str,
                   model_name: str, provider_url: str,
-                  max_iteration: int) -> None:
+                  max_iteration: int = 10) -> None:
         keys = load_keys()
         if not keys:
             raise Exception("An error occured upon loading API keys.")
@@ -17,8 +18,8 @@ class Agent_MBPP:
         task = load_tasks(task_file)
         if not task:
             raise Exception("An error occured upon loading task.")
-        solution = agent_loop_mbpp(task, model_name, keys,
-                                   client, max_iteration)
+        solution = asyncio.run(agent_loop_mbpp(task, model_name, keys,
+                               client, max_iteration))
         with open(output, "w") as file:
             json.dump(convert_to_dict(solution), file, indent=4)
 
