@@ -215,6 +215,12 @@ OPENROUTER_API_KEY_2=sk-or-...
 - [SWE-bench](https://www.swebench.com/)
 - [MBPP dataset](https://huggingface.co/datasets/google-research-datasets/mbpp)
 - [OpenRouter](https://openrouter.ai)
+- [SWE agent](https://swe-agent.com/latest/)
+- [Creer un Serveur MCP avec FastMCP](https://blog.stephane-robert.info/docs/developper/programmation/python/mcp-serveur/)
+- [Assertion guide](https://www.pythoniste.fr/python/linstruction-dassertion-en-python-assert/)
+- [What is a Python MCP Client](https://modelcontextprotocol.io/docs/getting-started/intro)
+- [Testing a MCP server](https://realpython.com/videos/testing-mcp-servers-mcp-client-overview/)
+- [AI Coding agents Guide](https://realpython.com/ai-coding-agents-guide/)
 
 ### AI usage
 Claude (Anthropic) was used as a coding assistant throughout this project:
