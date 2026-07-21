@@ -1,5 +1,8 @@
 from typing import Dict, List
 import subprocess
+import os
+
+TESTBED_PATH = os.environ.get("TESTBED_PATH", "/testbed")
 
 
 def run_tests(solution_code: str, test_list: List[str],
@@ -25,6 +28,7 @@ def run_tests(solution_code: str, test_list: List[str],
 def get_patch() -> Dict[str, str | int]:
     sub = subprocess.run("git -c core.fileMode=false diff",
                          shell=True,
+                         cwd=TESTBED_PATH,
                          capture_output=True,
                          text=True)
 

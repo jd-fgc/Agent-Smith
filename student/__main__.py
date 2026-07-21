@@ -52,7 +52,10 @@ async def repl(config, mcp_stdio=None, mcp_url=None):
             except asyncio.TimeoutError:
                 result = {"success": False, "output": "TIMEOUT"}
         print(result["output"], end="")
-        await sandbox.disconnect()
+        try:
+            await sandbox.disconnect()
+        except Exception:
+            pass
         return
 
     buffer = []
@@ -92,7 +95,10 @@ async def repl(config, mcp_stdio=None, mcp_url=None):
         except KeyboardInterrupt:
             print("\nQuit prog...")
             break
-    await sandbox.disconnect()
+    try:
+        await sandbox.disconnect()
+    except Exception:
+        pass
 
 
 def load_file(file: str) -> Any:

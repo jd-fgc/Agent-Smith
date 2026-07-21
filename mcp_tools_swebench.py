@@ -4,9 +4,8 @@ from asyncio import CancelledError
 import sys
 import os
 import json
+import subprocess
 
-
-TESTBED_PATH = os.environ.get("TESTBED_PATH", "/testbed")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp"))
 
 from mcp.server.fastmcp import FastMCP
@@ -20,18 +19,20 @@ from tools.execution_tools import get_patch as ex_get_patch, run_command as ex_r
 mcp = FastMCP("agent-smith")
 
 
+TESTBED_PATH = os.environ.get("TESTBED_PATH", "/testbed")
+CONTAINER_ID = os.environ.get("CONTAINER_ID", None)
+
+
 @mcp.tool()
 def read_file(filepath: str, start_line: int, end_line: int) -> str:
-    real_path = filepath.replace("/testbed", TESTBED_PATH)
-    result = fs_read_file(real_path, start_line, end_line)
-    return "\n".join(result)
-
-# # avec Docker
-# @mcp.tool()
-# def tool_read_file(filepath, start_line, end_line):
-#     cmd = f"docker exec {CONTAINER_ID} cat -n {filepath}"
-#     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-#     return result.stdout
+    if CONTAINER_ID:
+        cmd = f"docker exec {CONTAINER_ID} cat -n {filepath}"
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        return result.stdout
+    else:
+        real_path = filepath.replace("/testbed", TESTBED_PATH)
+        result = fs_read_file(real_path, start_line, end_line)
+        return "\n".join(result).replace(TESTBED_PATH, "/testbed")
 
 
 @mcp.tool()
@@ -55,14 +56,15 @@ def search_code(pattern: str, file_pattern: str) -> str:
 
 @mcp.tool()
 def search_function_or_class_definition_in_code(name: str) -> str:
-    result = cs_search_func(name)
-    return "\n".join(result)
+    result = cs_search_func(name, base_dir=TESTBED_PATH)
+    return "\n".join(result).replace(TESTBED_PATH, "/testbed")
 
 
 @mcp.tool()
 def find_references(name: str, filepath: str, line: int) -> str:
-    result = cs_find_refs(name, filepath, line)
-    return "\n".join(result)
+    real_filepath = filepath.replace("/testbed", TESTBED_PATH)
+    result = cs_find_refs(name, real_filepath, line, base_dir=TESTBED_PATH)
+    return "\n".join(result).replace(TESTBED_PATH, "/testbed")
 
 
 @mcp.tool()
