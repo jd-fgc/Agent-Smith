@@ -14,6 +14,9 @@ import asyncio
 import socket
 import sys
 import io
+import os
+import sys as _sys
+import tempfile
 nest_asyncio.apply()
 
 
@@ -24,26 +27,37 @@ def block_network() -> None:
     socket.socket = blocked  # type: ignore[misc, assignment]
 
 
-def worker(code: str, namespace: dict[str, Any],
-           result_queue: multiprocessing.Queue[dict[str, Any]], max_memory_mb: int) -> None:
+class FlushFile:
+    def __init__(self, f):
+        self.f = f
+
+    def write(self, text):
+        self.f.write(text)
+        self.f.flush()
+
+    def flush(self):
+        self.f.flush()
+
+
+def worker(code, namespace, output_file, max_memory_mb):
     restricted_memory = max_memory_mb * 1024 * 1024
-    resource.setrlimit(resource.RLIMIT_AS, (restricted_memory,
-                                            restricted_memory))
+    resource.setrlimit(resource.RLIMIT_AS, (restricted_memory, restricted_memory))
     block_network()
 
-    captured_stdout = io.StringIO()
-    sys.stdout = captured_stdout
-    try:
-        exec(code, namespace)
-        result_queue.put({"success": True,
-                          "output": captured_stdout.getvalue()})
-    except MemoryError:
-        sys.stdout = sys.__stdout__
-        result_queue.put({"success": False, "output": "MEMORY LIMIT EXCEEDED"})
-    except Exception as e:
-        result_queue.put({"success": False, "output": str(e)})
-    finally:
-        sys.stdout = sys.__stdout__
+    with open(output_file, 'w') as f:
+        sys.stdout = FlushFile(f)
+        try:
+            exec(code, namespace)
+        except MemoryError:
+            sys.stdout = sys.__stdout__
+            f.write("\nMEMORY LIMIT EXCEEDED")
+            f.flush()
+        except Exception as e:
+            sys.stdout = sys.__stdout__
+            f.write(str(e))
+            f.flush()
+        finally:
+            sys.stdout = sys.__stdout__
 
 
 class Sandbox:
@@ -60,8 +74,15 @@ class Sandbox:
         self._exit_stack = AsyncExitStack()
 
         if self.mcp_stdio:
-            command, *args = self.mcp_stdio.split()
-            params = StdioServerParameters(command=command, args=args)
+            parts = self.mcp_stdio.split()
+            flags = [p for p in parts[1:] if p.startswith("--")]
+            non_flags = [p for p in parts[1:] if not p.startswith("--")]
+            script = " ".join(non_flags)
+            params = StdioServerParameters(
+                command=_sys.executable,
+                args=[script] + flags,
+                env={**os.environ, "PYTHONPATH": "."}
+            )
             read, write = await self._exit_stack.enter_async_context(
                 stdio_client(params)
             )
@@ -151,6 +172,15 @@ class Sandbox:
             "KeyError": KeyError,
             "IndexError": IndexError,
             "StopIteration": StopIteration,
+            "AssertionError": AssertionError,
+            "ImportError": ImportError,
+            "dir": dir,
+            "ZeroDivisionError": ZeroDivisionError,
+            "MemoryError": MemoryError,
+            "all": all,
+            "any": any,
+            "bytearray": bytearray,
+            "bytes": bytes,
         }
 
         for tools_name in self.tools:
@@ -160,8 +190,7 @@ class Sandbox:
 
         return namespace
 
-    async def execute(self, code: str, namespace: dict[str, Any] | None = None,
-                      repl_mode: bool = False) -> dict[str, Any]:
+    async def execute(self, code: str, namespace: dict[str, Any] | None = None, repl_mode: bool = False) -> dict[str, Any]:
         if namespace is None:
             namespace = self._build_namespace()
 
@@ -177,22 +206,29 @@ class Sandbox:
             finally:
                 sys.stdout = sys.__stdout__
         else:
-            result_queue: multiprocessing.Queue[dict[str, Any]] = multiprocessing.Queue()
+            # créer un fichier temporaire pour capturer l'output
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp:
+                tmp_path = tmp.name
 
             process = multiprocessing.Process(
                 target=worker,
-                args=(code, namespace, result_queue, self.config.max_memory_mb)
+                args=(code, namespace, tmp_path, self.config.max_memory_mb)
             )
             process.start()
             process.join(timeout=self.config.max_execution_time_seconds)
+
             if process.is_alive():
                 process.terminate()
+                process.join()
+
+            # lire l'output même partiel
+            try:
+                with open(tmp_path, 'r') as f:
+                    output = f.read()
+            except Exception:
+                output = ""
+            os.unlink(tmp_path)
+
+            if not output and process.exitcode != 0:
                 return {"success": False, "output": "TIMEOUT"}
-            else:
-                if result_queue.empty():
-                    return {
-                        "success": False,
-                        "output": f"PROCESS KILLED (exitcode: \
-{process.exitcode})",
-                    }
-                return result_queue.get()
+            return {"success": True, "output": output}

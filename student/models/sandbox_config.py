@@ -29,7 +29,7 @@ class SandboxConfig(BaseModel):
             "datetime",
             "datetime.*",
             "array",
-            "cmath",
+            "cmath"
         ]
     )
     allowed_directories: List[str] = Field(

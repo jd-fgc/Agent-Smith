@@ -5,6 +5,8 @@ from .sandbox.sandbox import Sandbox
 from pydantic import ValidationError
 import asyncio
 from json import load
+import sys
+import codeop
 
 
 def sanitize_config(config: SandboxConfig) -> SandboxConfig:
@@ -18,8 +20,8 @@ def sanitize_config(config: SandboxConfig) -> SandboxConfig:
 
     import_unauthorized = ["os", "sys", "subprocess", "shutil", "socket",
                            "ctypes", "importlib", "builtins", "pickle"]
-    config.authorized_imports = [(imp for imp in config.authorized_imports if
-                                  imp not in import_unauthorized)]
+    config.authorized_imports = [imp for imp in config.authorized_imports
+                                 if imp not in import_unauthorized]
 
     system_dirs = ["/etc", "/bin", "/sbin", "/usr", "/boot",
                    "/root", "/proc", "/sys", "/dev"]
@@ -31,23 +33,64 @@ def sanitize_config(config: SandboxConfig) -> SandboxConfig:
     return config
 
 
-async def repl(config: SandboxConfig, mcp_stdio: str | None = None,
-               mcp_url: str | None = None) -> None:
+async def repl(config, mcp_stdio=None, mcp_url=None):
     sandbox = Sandbox(config=config, mcp_stdio=mcp_stdio, mcp_url=mcp_url)
     await sandbox.connect()
     namespace = sandbox._build_namespace()
+    interactive = sys.stdin.isatty()
 
+    if not interactive:
+        code = sys.stdin.read()
+        if sandbox.session is None:
+            result = await sandbox.execute(code, namespace, repl_mode=False)
+        else:
+            try:
+                result = await asyncio.wait_for(
+                    sandbox.execute(code, namespace, repl_mode=True),
+                    timeout=config.max_execution_time_seconds
+                )
+            except asyncio.TimeoutError:
+                result = {"success": False, "output": "TIMEOUT"}
+        print(result["output"], end="")
+        await sandbox.disconnect()
+        return
+
+    buffer = []
     while True:
         try:
-            code = input(">>> ")
-            if code == "exit":
+            if interactive:
+                prompt = "... " if buffer else ">>> "
+                line = input(prompt)
+            else:
+                line = input()
+
+            if line == "exit":
                 break
-            result = await sandbox.execute(code, namespace, repl_mode=True)
-            print(result["output"])
+
+            buffer.append(line)
+            source = "\n".join(buffer)
+
+            try:
+                code = codeop.compile_command(source)
+            except SyntaxError as e:
+                print(str(e))
+                buffer = []
+                continue
+
+            if code is None:
+                continue
+
+            buffer = []
+            result = await sandbox.execute(source, namespace, repl_mode=True)
+            print(result["output"], end="")
+
         except EOFError:
+            if buffer:
+                result = await sandbox.execute("\n".join(buffer), namespace, repl_mode=True)
+                print(result["output"], end="")
             break
         except KeyboardInterrupt:
-            print("\nC'est un vilain Ctrl + C ca mon chaton !")
+            print("\nQuit prog...")
             break
     await sandbox.disconnect()
 
@@ -81,7 +124,7 @@ def do_args() -> ArgumentParser:
     return parser
 
 
-def main() -> None:
+async def async_main() -> None:
     try:
         parser = do_args()
         args = parser.parse_args()
@@ -96,10 +139,14 @@ def main() -> None:
                 exit(1)
         else:
             config = SandboxConfig()
-        asyncio.run(repl(config, mcp_stdio=args.mcp_stdio,
-                         mcp_url=args.mcp_server))
+        await repl(config, mcp_stdio=args.mcp_stdio,
+                   mcp_url=args.mcp_server)
     except Exception as e:
         print(e)
+
+
+def main():
+    asyncio.run(async_main())
 
 
 if __name__ == "__main__":
