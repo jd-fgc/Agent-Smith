@@ -134,7 +134,6 @@ def build_eval_script(script: str, file_path: str) -> None:
         raise Exception("An error occured during the creation of the script.")
 
 
-
 def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                         keys: list[str], client: OpenAI,
                         max_iteration: int, sandbox) -> SolutionOutput:
@@ -253,7 +252,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                 sandbox_output=tool_result["output"],
                 retries=iteration
             ))
-        except(RateLimitError, Exception) as e:
+        except (RateLimitError, Exception) as e:
             request_time = round((time.time() - start) * 1000, 2)
             print(e)
             metrics.append(StepMetrics(
@@ -283,7 +282,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
     )
 
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     task = load_task("../cache/SWE.json")
     keys = load_keys()
     client = load_model(keys[0], "https://openrouter.ai/api/v1")

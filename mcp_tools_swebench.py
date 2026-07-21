@@ -11,7 +11,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcp
 
 from mcp.server.fastmcp import FastMCP
 from tools.file_system_tools import read_file as fs_read_file, edit_file as fs_edit_file, list_files as fs_list_files
-from tools.code_search_tools import search_code as cs_search_code, search_function_or_class_definition_in_code as cs_search_func, find_references as cs_find_refs
+from tools.code_search_tools import (search_code as cs_search_code,
+                                     search_function_or_class_definition_in_code as cs_search_func,
+                                     find_references as cs_find_refs)
 from tools.execution_tools import get_patch as ex_get_patch, run_command as ex_run_command, run_tests as ex_run_tests
 
 

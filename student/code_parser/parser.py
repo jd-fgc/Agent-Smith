@@ -115,8 +115,6 @@ def JSON_block(text: str) -> ToolCall:
         )
 
 
-
-
 def tool_call_reformer(call: ToolCall) -> str:
     result = []
     result.append(f"{call.tool}(")
@@ -148,21 +146,3 @@ def dict_format(text: str) -> ToolCall:
             tool=data["tool"],
             arguments=data.get("parameters", {})
         )
-
-
-# if __name__ == "__main__":
-#     test = """
-#     Bien sûr je vais répondre...
-#     <tool_call>
-#     read_file
-#     <arg_key>tool</arg_key>
-#     <arg_value>search_function_or_class_definition_in_code</arg_value>
-#     <arg_key>name</arg_key>
-#     <arg_value>RenameContentType</arg_value>
-#     """
-#     extracted_code = extract_code(test)
-#     if isinstance(extracted_code, ToolCall):
-#         result = tool_call_reformer(extracted_code)
-#         print(result)
-#     else:
-#         print(extracted_code)

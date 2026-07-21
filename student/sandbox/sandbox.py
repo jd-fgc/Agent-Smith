@@ -190,7 +190,8 @@ class Sandbox:
 
         return namespace
 
-    async def execute(self, code: str, namespace: dict[str, Any] | None = None, repl_mode: bool = False) -> dict[str, Any]:
+    async def execute(self, code: str, namespace: dict[str, Any] | None = None,
+                      repl_mode: bool = False) -> dict[str, Any]:
         if namespace is None:
             namespace = self._build_namespace()
 

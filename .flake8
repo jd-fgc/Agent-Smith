@@ -5,3 +5,4 @@ exclude =
     __pycache__/,
     .git/,
     moulinette
+    exams
