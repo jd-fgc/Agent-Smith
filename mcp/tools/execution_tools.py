@@ -7,6 +7,19 @@ TESTBED_PATH = os.environ.get("TESTBED_PATH", "/testbed")
 
 def run_tests(solution_code: str, test_list: List[str],
               test_imports: List[str]) -> str:
+    """Build a Python test script combining solution code and assertions.
+
+    Wraps each assertion in a try/except block to print PASS or FAIL.
+    The resulting script is intended to be executed by the sandbox.
+
+    Args:
+        solution_code: Python source code of the function to test.
+        test_list: List of assert statements (e.g. ["assert f(1) == 2"]).
+        test_imports: List of module names to import at the top of the script.
+
+    Returns:
+        A Python script as a string ready for exec().
+    """
     script = ""
     imp = ""
     tests = ""
@@ -26,6 +39,12 @@ def run_tests(solution_code: str, test_list: List[str],
 
 
 def get_patch() -> Dict[str, str | int]:
+    """Get the unified git diff of all changes in TESTBED_PATH.
+
+    Returns:
+        Dict with keys 'stdout' (diff output), 'stderr' and 'output' (exit code).
+    """
+
     sub = subprocess.run("git -c core.fileMode=false diff",
                          shell=True,
                          cwd=TESTBED_PATH,
@@ -40,6 +59,15 @@ def get_patch() -> Dict[str, str | int]:
 
 
 def run_command(command: str, workdir: str) -> Dict[str, str | int]:
+    """Execute a shell command in the specified working directory.
+
+    Args:
+        command: Shell command string to execute.
+        workdir: Working directory path.
+
+    Returns:
+        Dict with keys 'stdout', 'stderr' and 'output' (exit code).
+    """
     sub = subprocess.run(command,
                          shell=True,
                          cwd=workdir,

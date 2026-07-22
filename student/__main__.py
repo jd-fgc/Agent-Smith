@@ -10,6 +10,17 @@ import codeop
 
 
 def sanitize_config(config: SandboxConfig) -> SandboxConfig:
+    """Sanitize and clamp sandbox configuration values.
+
+    Enforces safe bounds on memory, timeout, authorized imports and
+    allowed directories. Removes dangerous imports and system directories.
+
+    Args:
+        config: The SandboxConfig to sanitize.
+
+    Returns:
+        The sanitized SandboxConfig.
+    """
     if config.max_memory_mb <= 50 or config.max_memory_mb >= 4096:
         config.max_memory_mb = 512
 
@@ -34,6 +45,17 @@ def sanitize_config(config: SandboxConfig) -> SandboxConfig:
 
 
 async def repl(config, mcp_stdio=None, mcp_url=None):
+    """Run the sandbox REPL in interactive or pipe mode.
+
+    In interactive mode, reads code line by line using codeop to handle
+    multi-line blocks. In pipe mode, reads all stdin at once and executes it.
+    Connects to an MCP server if mcp_stdio or mcp_url is provided.
+
+    Args:
+        config: SandboxConfig instance.
+        mcp_stdio: Command to launch MCP server via stdio.
+        mcp_url: URL of an HTTP MCP server.
+    """
     sandbox = Sandbox(config=config, mcp_stdio=mcp_stdio, mcp_url=mcp_url)
     await sandbox.connect()
     namespace = sandbox._build_namespace()
@@ -102,6 +124,14 @@ async def repl(config, mcp_stdio=None, mcp_url=None):
 
 
 def load_file(file: str) -> Any:
+    """Load and parse a JSON file.
+
+    Args:
+        file: Path to the JSON file.
+
+    Returns:
+        Parsed JSON content as a Python object.
+    """
     with open(file, "r") as f:
         return load(f)
 
@@ -112,6 +142,12 @@ def do_args() -> ArgumentParser:
         description="A project by Nisalmon and Jogamber",
         epilog="Qu'est-ce que le réel ? Quel est ta définition du réel ?!"
     )
+    """Build and return the CLI argument parser for the sandbox entry point.
+
+    Returns:
+        Configured ArgumentParser with --mcp-stdio, --mcp-server and
+        optional config_file positional argument.
+    """
     parser.add_argument(
         "--mcp-stdio",
         help="Launch the sandbox with the stdio server",
@@ -131,6 +167,7 @@ def do_args() -> ArgumentParser:
 
 
 async def async_main() -> None:
+    """Async entry point: parse args, load config and launch the REPL."""
     try:
         parser = do_args()
         args = parser.parse_args()
@@ -152,6 +189,7 @@ async def async_main() -> None:
 
 
 def main():
+    """Synchronous entry point, runs async_main via asyncio.run."""
     asyncio.run(async_main())
 
 
