@@ -5,12 +5,14 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "fire>=0.7.1",
     "mcp[cli]>=1.28.1",
     "nest-asyncio>=1.6.0",
     "openai>=2.45.0",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
+    "token-count>=0.2.1",
     "uv>=0.11.25",
 ]
 [tool.uv]
