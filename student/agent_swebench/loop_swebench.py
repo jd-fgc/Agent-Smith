@@ -63,47 +63,6 @@ def load_task(path: str) -> SWEBenchTaskInput:
         raise Exception(e)
 
 
-# def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[str, Any]],
-#                  state: str, tools_def: dict[str, Tool]) -> str:
-#     prompt = []
-#     prompt.append("Issue:\n")
-#     prompt.append(task.problem_statement + "\n\n")
-#     prompt.append("Historique:\n\n")
-#     for i, step in enumerate(history, start=1):
-#         prompt.append(f"Action {i}\n")
-#         prompt.append(f"Tool: {step['action']['tool']}\n")
-
-#         if step["action"]["args"]:
-#             prompt.append("Arguments:\n")
-#             for k, v in step["action"]["args"].items():
-#                 prompt.append(f"- {k}: {v}\n")
-
-#         prompt.append("Observation:\n")
-#         prompt.append(str(step["observation"]["result"]))
-#     prompt.append("Choose exactly ONE function.")
-#     prompt.append("Here are the available functions\n")
-#     for tool in tools:
-#         try:
-#             prompt.append(f"- {tools_def[tool].signature}")
-#             prompt.append(f"\t{tools_def[tool].description}")
-#         except KeyError:
-#             continue
-#     if state == "edit" and task.hints_text != "":
-#         prompt.append("Here are hints to help you fix the code:\n\n")
-#         prompt.append(f"{task.hints_text}\n")
-#     prompt.append("Never assume file names")
-#     prompt.append("Don't add unnecessary text. Be consise.")
-#     prompt.append("Return ONLY ONE valid JSON using the following schema.")
-#     prompt.append("Schema:")
-#     prompt.append("{")
-#     prompt.append("\t'tool': '<tool_name>',")
-#     prompt.append("\t'arguments': '{")
-#     prompt.append("\t...")
-#     prompt.append("\t}")
-#     prompt.append("}")
-#     return "\n".join(prompt)
-
-
 def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[str, Any]],
                  state: str, tools_def: dict[str, Tool]) -> str:
     prompt = []
@@ -135,6 +94,11 @@ def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[s
         prompt.append("\nHints:\n")
         prompt.append(f"{task.hints_text}\n")
 
+    if state == "explore":
+        prompt.append("\nIMPORTANT: Once you have identified the file and line to fix, call finish_exploration() immediately. Do not keep exploring.\n")
+    elif state == "edit":
+        prompt.append("\nIMPORTANT: Once you have made all edits, call finish_editing() immediately.\n")
+
     prompt.append("\nRules:\n")
     prompt.append("- Never assume file names, always explore first.\n")
     prompt.append("- Choose exactly ONE tool per response.\n")
@@ -160,10 +124,11 @@ def build_history(tool: str, observation: str) -> dict[str, Any]:
         "args": {}
     })
     for arg in args:
-        name, value = arg.split("=")
-        result["action"]["args"].update({
-            name: value
-        })
+        if "=" in arg:
+            name, value = arg.split("=", 1)
+            result["action"]["args"].update({
+                name.strip(): value.strip()
+            })
     result.update({
         "observation": {"result": observation}
     })
@@ -192,7 +157,11 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
     tools = load_tools()
     build_eval_script(tasks.eval_script, "./script.sh")
     while iteration < max_iteration and success is False:
+        print(f"Iteration {iteration + 1}/{max_iteration}, phase: {agent_phase.phase}")
         available_func = agent_phase.get_possible_func()
+        if agent_phase.phase == "explore" and iteration > 10:
+            agent_phase.phase = "edit"
+            print("Forcing phase change to edit after 10 iterations")
         iteration += 1
         start = time.time()
         try:
@@ -232,7 +201,12 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                 tool_result["output"] = "Switching to edit mode"
             elif code.tool == "finish_editing":
                 agent_phase.phase = "patch"
-                tool_result["output"] = "Switching to patch mode"
+
+                patch_result = sandbox.execute("tool_get_patch()")
+                patch = patch_result.get("output", "")
+                if patch:
+                    success = True
+                break
             else:
                 tool_result = sandbox.execute(tool_call)
             if code.tool == "get_patch":
@@ -296,12 +270,11 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                 sandbox_output=tool_result.get("output", ""),
                 retries=iteration
             ))
-        except RateLimitError:
+        except RateLimitError as e:
             key_index = (key_index + 1) % len(keys)
             client = load_model(keys[key_index], str(client.base_url))
             time.sleep(5)
         except Exception as e:
-            print(e)
             metrics.append(StepMetrics(
                 step=len(metrics) + 1,
                 input_tokens=0,
@@ -313,7 +286,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                 sandbox_input="",
                 sandbox_output="",
                 retries=iteration
-                ))
+            ))
     return SolutionOutput(
         task_id=tasks.instance_id,
         benchmark="swebench",
@@ -323,7 +296,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
         total_requests=len(metrics),
         total_input_tokens=sum(inputs.input_tokens for inputs in metrics),
         total_output_tokens=sum(inputs.output_tokens for inputs in metrics),
-        total_time_seconds=sum(inputs.request_time_ms for inputs in metrics),
+        total_time_seconds=sum(inputs.request_time_ms for inputs in metrics) / 1000,
         steps=metrics,
         system_prompt=message
     )

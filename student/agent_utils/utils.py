@@ -13,17 +13,19 @@ class Tool:
 
 def load_model(key: str, provider_url: str) -> OpenAI:
     load_dotenv()
-    client = OpenAI(api_key=key,
-                    base_url=provider_url)
+    client = OpenAI(
+        api_key=key,
+        base_url=provider_url,
+        timeout=30.0
+    )
     return client
 
 
 def respond(llm: OpenAI, model: str, prompt: str) -> ChatCompletion:
     response = llm.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        timeout=30
     )
     return response
 
