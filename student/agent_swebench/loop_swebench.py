@@ -1,7 +1,7 @@
 from student.models.SWE_models import SWEBenchTaskInput, StepMetrics, SolutionOutput
 from student.agent_utils import load_keys, load_model, respond, load_tools, Tool
 from openai import OpenAI, RateLimitError
-from ..code_parser import ToolCall, tool_call_reformer, extract_code
+from student.code_parser import ToolCall, tool_call_reformer, extract_code
 from typing import Any
 import time
 import json
@@ -54,7 +54,7 @@ def load_task(path: str) -> SWEBenchTaskInput:
         return SWEBenchTaskInput(
             instance_id=task["instance_id"],
             problem_statement=task["problem_statement"],
-            docker_image=task["docker_image"],
+            docker_image=task.get("docker_image", task.get("dockerhub_image_name", "")),
             eval_script=task["eval_script"],
             hints_text=task["hints_text"],
             repo=task["repo"]
@@ -63,44 +63,88 @@ def load_task(path: str) -> SWEBenchTaskInput:
         raise Exception(e)
 
 
+# def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[str, Any]],
+#                  state: str, tools_def: dict[str, Tool]) -> str:
+#     prompt = []
+#     prompt.append("Issue:\n")
+#     prompt.append(task.problem_statement + "\n\n")
+#     prompt.append("Historique:\n\n")
+#     for i, step in enumerate(history, start=1):
+#         prompt.append(f"Action {i}\n")
+#         prompt.append(f"Tool: {step['action']['tool']}\n")
+
+#         if step["action"]["args"]:
+#             prompt.append("Arguments:\n")
+#             for k, v in step["action"]["args"].items():
+#                 prompt.append(f"- {k}: {v}\n")
+
+#         prompt.append("Observation:\n")
+#         prompt.append(str(step["observation"]["result"]))
+#     prompt.append("Choose exactly ONE function.")
+#     prompt.append("Here are the available functions\n")
+#     for tool in tools:
+#         try:
+#             prompt.append(f"- {tools_def[tool].signature}")
+#             prompt.append(f"\t{tools_def[tool].description}")
+#         except KeyError:
+#             continue
+#     if state == "edit" and task.hints_text != "":
+#         prompt.append("Here are hints to help you fix the code:\n\n")
+#         prompt.append(f"{task.hints_text}\n")
+#     prompt.append("Never assume file names")
+#     prompt.append("Don't add unnecessary text. Be consise.")
+#     prompt.append("Return ONLY ONE valid JSON using the following schema.")
+#     prompt.append("Schema:")
+#     prompt.append("{")
+#     prompt.append("\t'tool': '<tool_name>',")
+#     prompt.append("\t'arguments': '{")
+#     prompt.append("\t...")
+#     prompt.append("\t}")
+#     prompt.append("}")
+#     return "\n".join(prompt)
+
+
 def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[str, Any]],
                  state: str, tools_def: dict[str, Tool]) -> str:
     prompt = []
+    prompt.append("You are an autonomous software engineer fixing a bug in a real repository.\n")
     prompt.append("Issue:\n")
     prompt.append(task.problem_statement + "\n\n")
-    prompt.append("Historique:\n\n")
-    for i, step in enumerate(history, start=1):
-        prompt.append(f"Action {i}\n")
-        prompt.append(f"Tool: {step['action']['tool']}\n")
 
-        if step["action"]["args"]:
-            prompt.append("Arguments:\n")
-            for k, v in step["action"]["args"].items():
-                prompt.append(f"- {k}: {v}\n")
+    if history:
+        prompt.append("History:\n\n")
+        for i, step in enumerate(history, start=1):
+            prompt.append(f"Step {i}:\n")
+            prompt.append(f"Tool: {step['action']['tool']}\n")
+            if step["action"]["args"]:
+                prompt.append("Arguments:\n")
+                for k, v in step["action"]["args"].items():
+                    prompt.append(f"  {k}: {v}\n")
+            prompt.append("Observation:\n")
+            prompt.append(str(step["observation"]["result"]) + "\n\n")
 
-        prompt.append("Observation:\n")
-        prompt.append(step["observation"]["result"])
-    prompt.append("Choose exactly ONE function.")
-    prompt.append("Here are the available functions\n")
+    prompt.append("Available tools:\n")
     for tool in tools:
         try:
-            prompt.append(f"- {tools_def[tool].signature}")
-            prompt.append(f"\t{tools_def[tool].description}")
+            prompt.append(f"- {tools_def[tool].signature}\n")
+            prompt.append(f"  {tools_def[tool].description}\n")
         except KeyError:
             continue
+
     if state == "edit" and task.hints_text != "":
-        prompt.append("Here are hints to help you fix the code:\n\n")
+        prompt.append("\nHints:\n")
         prompt.append(f"{task.hints_text}\n")
-    prompt.append("Never assume file names")
-    prompt.append("Don't add unnecessary text. Be consise.")
-    prompt.append("Return ONLY ONE valid JSON using the following schema.")
-    prompt.append("Schema:")
-    prompt.append("{")
-    prompt.append("\t'tool': '<tool_name>',")
-    prompt.append("\t'arguments': '{")
-    prompt.append("\t...")
-    prompt.append("\t}")
-    prompt.append("}")
+
+    prompt.append("\nRules:\n")
+    prompt.append("- Never assume file names, always explore first.\n")
+    prompt.append("- Choose exactly ONE tool per response.\n")
+    prompt.append("- Return ONLY valid JSON, no explanation, no markdown.\n")
+    prompt.append("\nResponse format:\n")
+    prompt.append('{"tool": "<tool_name>", "arguments": {"<arg>": "<value>"}}\n')
+    prompt.append("\nExamples:\n")
+    prompt.append('{"tool": "run_command", "arguments": {"command": "ls /testbed", "workdir": "/testbed"}}\n')
+    prompt.append('{"tool": "tool_read_file", "arguments": {"filepath": "/testbed/django/core/paginator.py", "start_line": "1", "end_line": "50"}}\n')
+
     return "\n".join(prompt)
 
 
@@ -138,10 +182,10 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                         keys: list[str], client: OpenAI,
                         max_iteration: int, sandbox) -> SolutionOutput:
     agent_phase = Phases()
-    current_key = 0
-    key_usage = 0
+    key_index = 0
     metrics = []
     history = []
+    message = ""
     success = False
     patch = ""
     iteration = 0
@@ -150,11 +194,11 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
     while iteration < max_iteration and success is False:
         available_func = agent_phase.get_possible_func()
         iteration += 1
+        start = time.time()
         try:
             tool_call = ""
             tool_result = {}
             message = build_prompt(tasks, available_func, history, agent_phase.phase, tools)
-            start = time.time()
             answer = respond(client, model, message)
             request_time = round((time.time() - start) * 1000, 2)
             raw_response = answer.choices[0].message.content
@@ -194,7 +238,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
             if code.tool == "get_patch":
                 if tool_result["output"].strip():
                     success = True
-                    patch = tool_result
+                    patch = tool_result.get("output", "")
                     metrics.append(StepMetrics(
                         step=len(metrics)+1,
                         input_tokens=answer.usage.prompt_tokens,
@@ -204,7 +248,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                         model_name=model,
                         llm_output=raw_response,
                         sandbox_input=tool_call,
-                        sandbox_output=tool_result["output"],
+                        sandbox_output=tool_result.get("output", ""),
                         retries=iteration
                     ))
                     break
@@ -227,7 +271,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                         model_name=model,
                         llm_output=raw_response,
                         sandbox_input=tool_call,
-                        sandbox_output=tool_result["output"],
+                        sandbox_output=tool_result.get("output", ""),
                         retries=iteration
                     ))
                     continue
@@ -249,11 +293,14 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                 model_name=model,
                 llm_output=raw_response,
                 sandbox_input=tool_call,
-                sandbox_output=tool_result["output"],
+                sandbox_output=tool_result.get("output", ""),
                 retries=iteration
             ))
-        except (RateLimitError, Exception) as e:
-            request_time = round((time.time() - start) * 1000, 2)
+        except RateLimitError:
+            key_index = (key_index + 1) % len(keys)
+            client = load_model(keys[key_index], str(client.base_url))
+            time.sleep(5)
+        except Exception as e:
             print(e)
             metrics.append(StepMetrics(
                 step=len(metrics) + 1,
@@ -268,7 +315,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                 retries=iteration
                 ))
     return SolutionOutput(
-        task_id=task.instance_id,
+        task_id=tasks.instance_id,
         benchmark="swebench",
         success=success,
         solution=patch,

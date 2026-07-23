@@ -136,13 +136,14 @@ def dict_format(text: str) -> ToolCall:
     except Exception:
         data = ast.literal_eval(text)
 
+    arguments = data.get("arguments", data.get("parameters", {}))
+    if isinstance(arguments, str):
+        try:
+            arguments = json.loads(arguments)
+        except Exception:
+            arguments = {}
+
     try:
-        return ToolCall(
-            tool=data["tool"],
-            arguments=data.get("arguments", {})
-        )
+        return ToolCall(tool=data["tool"], arguments=arguments)
     except KeyError:
-        return ToolCall(
-            tool=data["tool"],
-            arguments=data.get("parameters", {})
-        )
+        return ToolCall(tool=data.get("tool", ""), arguments=arguments)
