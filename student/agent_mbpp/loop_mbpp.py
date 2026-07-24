@@ -6,13 +6,17 @@ from ..mcp.tools.execution_tools import run_tests
 from ..agent_utils import respond
 from openai import OpenAI, RateLimitError
 from openai.types.chat import ChatCompletion
-from typing import Any
+from typing import Any, List
 from token_count import TokenCount
 import time
 import json
 
 
 def load_tasks(path) -> MBPPTaskInput:
+    '''
+    This function load the JSON file stored at {path} and
+    return the content into a MBPPTaskInput object.
+    '''
     try:
         with open(path, "r") as file:
             task = json.load(file)
@@ -28,14 +32,13 @@ def load_tasks(path) -> MBPPTaskInput:
         return []
 
 
-def get_task_from_id(tasks: list[dict[str, Any]], id: int) -> dict[str, Any]:
-    for task in tasks:
-        if task["task_id"] == id:
-            return task
-    return {}
-
-
 def get_visible_tokens(answer: ChatCompletion):
+    '''
+    This functions purpose is to calculate number of token output
+    depending on if the LLM uses "reasoning_tokens" which are caculated
+    in the output for certain model and if they're used, we use another
+    package, token_count, and return the number of output token
+    '''
     usage = answer.usage
     reasoning = 0
     if hasattr(usage, "completion_tokens_details"):
@@ -47,6 +50,39 @@ def get_visible_tokens(answer: ChatCompletion):
         return usage.completion_tokens - reasoning
 
     return None
+
+
+def build_script(solution_code: str, test_list: List[str],
+                 test_imports: List[str]) -> str:
+    """Build a Python test script combining solution code and assertions.
+
+    Wraps each assertion in a try/except block to print PASS or FAIL.
+    The resulting script is intended to be executed by the sandbox.
+
+    Args:
+        solution_code: Python source code of the function to test.
+        test_list: List of assert statements (e.g. ["assert f(1) == 2"]).
+        test_imports: List of module names to import at the top of the script.
+
+    Returns:
+        A Python script as a string ready for exec().
+    """
+    script = ""
+    imp = ""
+    tests = ""
+    for impt in test_imports:
+        imp += f"import {impt}\n"
+    for tst in test_list:
+        escaped = tst.replace("'", '"')
+        block = "try:\n"
+        block += f"    {tst}\n"
+        block += f"    print('PASS: {escaped}')\n"
+        block += "except AssertionError:\n"
+        block += f"    print('FAIL: {escaped}')\n"
+        tests += block
+    script = imp + solution_code + "\n" + tests
+
+    return script
 
 
 async def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
@@ -79,7 +115,7 @@ async def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
             code = extract_code(answer.choices[0].message.content)
             if isinstance(code, ToolCall):
                 code = tool_call_reformer(code)
-            script = run_tests(
+            script = build_script(
                 code,
                 tasks.test_list,
                 tasks.test_imports
