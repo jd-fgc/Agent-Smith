@@ -125,7 +125,7 @@ def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[s
     prompt.append('{"tool": "<tool_name>", "arguments": {"<arg>": "<value>"}}\n')
     prompt.append("\nExamples:\n")
     prompt.append('{"tool": "run_command", "arguments": {"command": "ls /testbed", "workdir": "/testbed"}}\n')
-    prompt.append('{"tool": "tool_read_file", "arguments": {"filepath": "/testbed/django/core/paginator.py", '
+    prompt.append('{"tool": "read_file", "arguments": {"filepath": "/testbed/django/core/paginator.py", '
                   '"start_line": "1", "end_line": "50"}}\n')
 
     return "\n".join(prompt)
@@ -206,16 +206,25 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
     build_eval_script(tasks.eval_script, "./script.sh")
     while iteration < max_iteration and success is False:
         print(f"Iteration {iteration + 1}/{max_iteration}, phase: {agent_phase.phase}")
-        available_func = agent_phase.get_possible_func()
         if agent_phase.phase == "explore" and iteration > 10:
             agent_phase.phase = "edit"
             print("Forcing phase change to edit after 10 iterations")
+
+        if agent_phase.phase == "edit" and iteration > 20:
+            agent_phase.phase = "patch"
+            patch_result = sandbox.execute("get_patch()")
+            patch = patch_result.get("output", "")
+            if patch:
+                success = True
+                break
+            print("Forcing patch generation after 20 iterations in edit phase")
+        available_func = agent_phase.get_possible_func()
         iteration += 1
         start = time.time()
         try:
             tool_call = ""
             tool_result = {}
-            message = build_prompt(tasks, available_func, history, agent_phase.phase, tools)
+            message = build_prompt(tasks, available_func, history[-6:], agent_phase.phase, tools)
             answer = respond(client, model, message)
             request_time = round((time.time() - start) * 1000, 2)
             raw_response = answer.choices[0].message.content
@@ -250,7 +259,7 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
             elif code.tool == "finish_editing":
                 agent_phase.phase = "patch"
 
-                patch_result = sandbox.execute("tool_get_patch()")
+                patch_result = sandbox.execute("get_patch()")
                 patch = patch_result.get("output", "")
                 if patch:
                     success = True

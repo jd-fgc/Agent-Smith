@@ -30,19 +30,19 @@ class DockerSandbox:
         args_str = tool_call.split("(", 1)[1].rsplit(")", 1)[0]
         args = self._parse_args(args_str)
 
-        if func_name == "tool_read_file":
+        if func_name == "read_file":
             return self._read_file(**args)
-        elif func_name == "tool_edit_file":
+        elif func_name == "edit_file":
             return self._edit_file(**args)
-        elif func_name == "tool_list_files":
+        elif func_name == "list_files":
             return self._list_files(**args)
-        elif func_name == "tool_search_code":
+        elif func_name == "search_code":
             return self._search_code(**args)
-        elif func_name == "tool_search_function_or_class_definition_in_code":
+        elif func_name == "search_function_or_class_definition_in_code":
             return self._search_definition(**args)
-        elif func_name == "tool_find_references":
+        elif func_name == "find_references":
             return self._find_references(**args)
-        elif func_name == "tool_get_patch":
+        elif func_name == "get_patch":
             return self._get_patch()
         elif func_name == "run_command":
             return self._run_command(**args)
