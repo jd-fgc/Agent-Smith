@@ -8,10 +8,18 @@ import json
 
 
 class Phases:
+    '''
+    This class is used for the LLM to switch Phases and to keep track
+    of where he is to fixing the given task.
+    '''
     def __init__(self) -> None:
         self.phase = "explore"
 
     def get_possible_func(self) -> list[str]:
+        '''
+        This method return all the possible action the LLM can choose
+        depending on what phase he currently he's on.
+        '''
         if self.phase == "explore" or self.phase == "read":
             return [
                 "read_file",
@@ -48,6 +56,10 @@ class Phases:
 
 
 def load_task(path: str) -> SWEBenchTaskInput:
+    '''
+    This function load the JSON file stored at {path} and
+    return the content into a SWEBenchTaskInput object.
+    '''
     try:
         with open(path, "r") as file:
             task = json.load(file)
@@ -65,6 +77,11 @@ def load_task(path: str) -> SWEBenchTaskInput:
 
 def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[str, Any]],
                  state: str, tools_def: dict[str, Tool]) -> str:
+    '''
+    This function builds the prompt that the LLM will receive.
+    It'll be called before every iteration to change the given prompt
+    so that way the LLM can keep track of what he has done previously.
+    '''
     prompt = []
     prompt.append("You are an autonomous software engineer fixing a bug in a real repository.\n")
     prompt.append("Issue:\n")
@@ -95,7 +112,8 @@ def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[s
         prompt.append(f"{task.hints_text}\n")
 
     if state == "explore":
-        prompt.append("\nIMPORTANT: Once you have identified the file and line to fix, call finish_exploration() immediately. Do not keep exploring.\n")
+        prompt.append("\nIMPORTANT: Once you have identified the file and line to fix, call finish_exploration() "
+                      "immediately. Do not keep exploring.\n")
     elif state == "edit":
         prompt.append("\nIMPORTANT: Once you have made all edits, call finish_editing() immediately.\n")
 
@@ -107,12 +125,18 @@ def build_prompt(task: SWEBenchTaskInput, tools: list[str], history: list[dict[s
     prompt.append('{"tool": "<tool_name>", "arguments": {"<arg>": "<value>"}}\n')
     prompt.append("\nExamples:\n")
     prompt.append('{"tool": "run_command", "arguments": {"command": "ls /testbed", "workdir": "/testbed"}}\n')
-    prompt.append('{"tool": "tool_read_file", "arguments": {"filepath": "/testbed/django/core/paginator.py", "start_line": "1", "end_line": "50"}}\n')
+    prompt.append('{"tool": "tool_read_file", "arguments": {"filepath": "/testbed/django/core/paginator.py", '
+                  '"start_line": "1", "end_line": "50"}}\n')
 
     return "\n".join(prompt)
 
 
 def build_history(tool: str, observation: str) -> dict[str, Any]:
+    '''
+    This function builds a dictionnary of the current action and the output
+    that the LLM choosed to execute.
+    This will then be added to the prompt.
+    '''
     result = {}
     result.update({"action": {}})
     func_name = tool.split("(")[0]
@@ -136,6 +160,10 @@ def build_history(tool: str, observation: str) -> dict[str, Any]:
 
 
 def build_eval_script(script: str, file_path: str) -> None:
+    '''
+    This function builds the script {script} to evaluate the Task output
+    and store's it into {file_path}.
+    '''
     try:
         with open(file_path, "w") as file:
             file.write(script)
@@ -146,6 +174,26 @@ def build_eval_script(script: str, file_path: str) -> None:
 def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                         keys: list[str], client: OpenAI,
                         max_iteration: int, sandbox) -> SolutionOutput:
+    '''
+    This function is the main loop.
+    It'll run as long as there is no success or the number of iteration is lower
+    then {max_iteration}.
+
+    === LOOP ===
+
+    A single iteration work as follow:
+        The prompt is build and given to the LLM.
+        From the LLM's answer, we extract the code he gave.
+        (if it is not return as a ToolCall object, we continue into the next iteration.)
+        Then, the code is executed into the sandbox.
+        If the LLM asked get_patch() and this function return something, we assume he fixed
+        the problem, the loop is stopped.
+        If not, we use build_history() to expend the LLM's actions history
+        and another iteration takes place.
+
+        Upon completion (fail or success),
+        we fill a SolutionOutput object and return it.
+    '''
     agent_phase = Phases()
     key_index = 0
     metrics = []
@@ -270,11 +318,11 @@ def agent_loop_swebench(tasks: SWEBenchTaskInput, model: str,
                 sandbox_output=tool_result.get("output", ""),
                 retries=iteration
             ))
-        except RateLimitError as e:
+        except RateLimitError:
             key_index = (key_index + 1) % len(keys)
             client = load_model(keys[key_index], str(client.base_url))
             time.sleep(5)
-        except Exception as e:
+        except Exception:
             metrics.append(StepMetrics(
                 step=len(metrics) + 1,
                 input_tokens=0,

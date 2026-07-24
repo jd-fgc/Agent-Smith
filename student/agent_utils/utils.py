@@ -5,6 +5,10 @@ import os
 
 
 class Tool:
+    '''
+    This class is used to create object that will be given to build
+    the LLM prompt.
+    '''
     def __init__(self, name: str, signature: str, description: str) -> None:
         self.name = name
         self.signature = signature
@@ -12,6 +16,12 @@ class Tool:
 
 
 def load_model(key: str, provider_url: str) -> OpenAI:
+    '''
+    This function loads the model used openai package.
+    the key {key} must be from {provider_url}.
+
+    It returns an OpenAI object.
+    '''
     load_dotenv()
     client = OpenAI(
         api_key=key,
@@ -22,6 +32,16 @@ def load_model(key: str, provider_url: str) -> OpenAI:
 
 
 def respond(llm: OpenAI, model: str, prompt: str) -> ChatCompletion:
+    '''
+    This function is where the LLM will generate his answers.
+
+    It'll use the given llm to answer to {prompt} and will be using
+    {model}.
+
+    It returns a ChatCompletion object.
+    Useful to retrieve some informations, such as the number of input and output
+    tokens.
+    '''
     response = llm.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
@@ -31,6 +51,11 @@ def respond(llm: OpenAI, model: str, prompt: str) -> ChatCompletion:
 
 
 def load_keys() -> list[str]:
+    '''
+    This function is used to load all the API keys
+
+    It returns a list with all the keys.
+    '''
     load_dotenv()
     keys = []
     for i in range(5):
@@ -39,6 +64,10 @@ def load_keys() -> list[str]:
 
 
 def load_tools() -> dict[str, Tool]:
+    '''
+    This function is used to load all the Tools and store them in a dictionnary
+    with Tool.name as key and Tool as value.
+    '''
     result = {}
     Tools = []
     Tools.append(Tool(

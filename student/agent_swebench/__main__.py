@@ -1,28 +1,7 @@
 import argparse
-import json
 from student.models.DockerSandbox import DockerSandbox
 from student.agent_utils import load_keys, load_model
 from student.agent_swebench.loop_swebench import agent_loop_swebench, load_task
-
-
-class Agent_SWE:
-    def run_agent(self, task_file: str, output: str,
-                  model_name: str, provider_url: str) -> None:
-        task = load_task(task_file)
-        keys = load_keys()
-        client = load_model(keys[0], provider_url)
-        sandbox = DockerSandbox(task.docker_image)
-
-        try:
-            sandbox.start()
-            result = agent_loop_swebench(
-                task, model_name, keys, client, 30, sandbox
-            )
-        finally:
-            sandbox.stop()
-
-        with open(output, "w") as f:
-            f.write(result.model_dump_json(indent=2))
 
 
 def main():
