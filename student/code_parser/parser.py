@@ -7,11 +7,21 @@ import re
 
 
 class ToolCall(BaseModel):
+    '''
+    This class is used for convenients purposes
+
+    It's the equivalent of a function call and will be transformed
+    into a string further on the code.
+    '''
     tool: str
     arguments: dict[str, Any]
 
 
 def extract_code(text: str) -> str | ToolCall:
+    '''
+    This function takes the text given by the LLM
+    and try to extract code form the text
+    '''
     if text.startswith("{"):
         return dict_format(text)
     elif "<tool_call>" in text:
@@ -30,6 +40,9 @@ def extract_code(text: str) -> str | ToolCall:
 
 
 def python_block(text: str) -> str | None:
+    '''
+    This function extract the code if the text is in python format
+    '''
     lines = text.splitlines()
     in_block = False
     code = []
@@ -47,6 +60,9 @@ def python_block(text: str) -> str | None:
 
 
 def ReAct_block(text: str) -> ToolCall:
+    '''
+    This function extract the code if the text is in ReAct format
+    '''
     lines = text.splitlines()
     tool = ""
     arguments = []
@@ -74,6 +90,9 @@ def ReAct_block(text: str) -> ToolCall:
 
 
 def XML_block(text: str) -> ToolCall:
+    '''
+    This function extract the code if the text is in XML format
+    '''
     root = ET.fromstring(text)
     tool = root.attrib.get("name")
     arguments = {}
@@ -88,6 +107,9 @@ def XML_block(text: str) -> ToolCall:
 
 
 def JSON_block(text: str) -> ToolCall:
+    '''
+    This function extract the code if the text is in JSON format
+    '''
     content = text.split("<tool_call>", 1)[1]
     if "<arg_key>" not in text:
         if "</tool_call>" in text:
@@ -116,6 +138,10 @@ def JSON_block(text: str) -> ToolCall:
 
 
 def tool_call_reformer(call: ToolCall) -> str:
+    '''
+    This function return a string of a function call
+    from a ToolCall object.
+    '''
     result = []
     result.append(f"{call.tool}(")
     args = len(call.arguments)
@@ -131,6 +157,9 @@ def tool_call_reformer(call: ToolCall) -> str:
 
 
 def dict_format(text: str) -> ToolCall:
+    '''
+    This function extract the code if the text is in dict format
+    '''
     try:
         data = json.loads(text)
     except Exception:

@@ -88,6 +88,21 @@ def build_script(solution_code: str, test_list: List[str],
 async def agent_loop_mbpp(tasks: MBPPTaskInput, model: str,
                           keys: list[str], client: OpenAI,
                           max_iteration: int) -> SolutionOutput:
+    '''
+        This function is the main loop.
+        It'll run as long as there is no success or the number of iteration is lower
+        then {max_iteration}.
+
+        === LOOP ===
+
+        A single iteration work as follow:
+            The prompt is build and given to the LLM.
+            From the LLM's answer, we extract the code he gave.
+            Then, the code is executed into the sandbox.
+
+            Upon completion (fail or success),
+            we fill a SolutionOutput object and return it.
+    '''
     current_key = 0
     iteration = 0
     original_prompt = tasks.task_definition + \
