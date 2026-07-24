@@ -20,5 +20,8 @@ echo "Installing dependencies"
 echo "Pulling Docker image for MBPP Tests"
 docker pull python:3.11-slim
 
+echo ""
+echo "============== INSTALL FINISH =============="
+echo ""
 echo "To use the program, don't forget to activate the virtual environment by entering this command:"
-echo "source $VENV/bin/activate && uv sync && cd moulinette && uv sync"
+echo "source $VENV/bin/activate && uv sync && cd moulinette && uv sync && cd .."
